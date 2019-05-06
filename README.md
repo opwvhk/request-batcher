@@ -38,7 +38,8 @@ public class Example {
         }
 
 
-        // Step 3 (cleanup): to close your application, the queue must be shutdown (after that, the BatchRunner will stop itself when the queue is empty)
+        // Step 3 (cleanup): to close your application, the queue must be shutdown
+        // (after that, the BatchRunner will stop itself when the queue is empty)
 
         batchQueue.shutdown();
         executor.shutdown();
