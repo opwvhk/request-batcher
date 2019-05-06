@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+ 		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ 		xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+        <groupId>net.sf.opk</groupId>
+        <artifactId>opk-parent</artifactId>
+        <version>6-SNAPSHOT</version>
+    </parent>
+
+	<groupId>com.bol.opwvhk</groupId>
+	<artifactId>request-batcher</artifactId>
+	<version>0.1-SNAPSHOT</version>
+
+    <inceptionYear>2019</inceptionYear>
+    <organization>
+        <!-- Not really an organization, but the owner of the copyrights. -->
+        <name>Oscar Westra van Holthe - Kind</name>
+        <url>http://oscar.westravanholthe.nl/</url>
+    </organization>
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <properties>
+		<jdk.version>1.8</jdk.version>
+		<maven.compiler.source>${jdk.version}</maven.compiler.source>
+		<maven.compiler.target>${jdk.version}</maven.compiler.target>
+		<maven.compiler.testSource>${jdk.version}</maven.compiler.testSource>
+		<maven.compiler.testTarget>${jdk.version}</maven.compiler.testTarget>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+	</properties>
+
+	<dependencies>
+		<!-- Logging -->
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>1.7.21</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-simple</artifactId>
+			<version>1.7.21</version>
+            <scope>test</scope>
+		</dependency>
+		<!-- Testing -->
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.12</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.assertj</groupId>
+			<artifactId>assertj-core</artifactId>
+			<version>3.11.1</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<version>2.26.0</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+</project>
