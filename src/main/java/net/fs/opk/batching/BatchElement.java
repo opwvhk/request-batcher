@@ -39,7 +39,7 @@ public class BatchElement<T, R> {
     }
 
     /**
-     * Report a value for this batch element. Calling this method successfull completes the {@link CompletableFuture CompletableFuture&lt;R&gt;} returned by
+     * Report a value for this batch element. Calling this method successfully completes the {@link CompletableFuture CompletableFuture&lt;R&gt;} returned by
      * {@link BatchQueue#enqueue(Object, long, TimeUnit) BatchQueue&lt;T, R&gt;#enqueue(T, long, TimeUnit)} or
      * {@link BatchQueue#enqueue(Object) BatchQueue&lt;T, R&gt;#enqueue(T)}.
      *
@@ -50,7 +50,7 @@ public class BatchElement<T, R> {
     }
 
     /**
-     * Report an errro for this batch element. Calling this method completes the {@link CompletableFuture CompletableFuture&lt;R&gt;} returned by
+     * Report an error for this batch element. Calling this method completes the {@link CompletableFuture CompletableFuture&lt;R&gt;} returned by
      * {@link BatchQueue#enqueue(Object, long, TimeUnit) BatchQueue&lt;T, R&gt;#enqueue(T, long, TimeUnit)} or
      * {@link BatchQueue#enqueue(Object) BatchQueue&lt;T, R&gt;#enqueue(T)} exceptionally.
      *

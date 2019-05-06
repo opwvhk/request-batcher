@@ -73,7 +73,7 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 	/**
 	 * Create a batch runner that reads off a queue.
      *
-     * <p>Note: the parameter {@code batchTimeoutMs} is meant to enforce that the {@code BatchRunner} will not hang. If your implementation alrady handles
+     * <p>Note: the parameter {@code batchTimeoutMs} is meant to enforce that the batched calls will not hang. If your implementation already handles
      * timeouts, set this to a value higher than your timeout.</p>
 	 *
 	 * @param queue          the batch queue to read
@@ -111,8 +111,9 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 
 
 	/**
-	 * Try a single batch call. This method waits a short time for a batch to fill, and then up to the specified linger time for more elements. Then, if there
-	 * are any, calls {@link #executeBatch(List) executeBatch(List&lt;BatchElement&lt;Request, Response&gt;&gt;)}.
+	 * Try a single batch call. This method waits a short time for a batch to fill, and then up to the specified linger time for more elements (less if the
+     * first element was already waiting when this method started). Then, if there are any elements, calls
+     * {@link #executeBatch(List) executeBatch(List&lt;BatchElement&lt;Request, Response&gt;&gt;)}.
 	 *
 	 * @return {@code true} if this method should be called again, {@code false} if the queue has shut down and is empty.
 	 * @throws InterruptedException if this thread was interrupted while waiting

@@ -52,7 +52,7 @@ public class BatchQueue<Request, Response> {
 	/**
 	 * Whether we can accept new elements.
 	 */
-	private boolean closed;
+	private boolean isShutdown;
 
 	/*
 	 * Concurrency control uses the classic two-condition algorithm found in any textbook.
@@ -63,11 +63,11 @@ public class BatchQueue<Request, Response> {
 	 */
 	private final ReentrantLock lock;
 	/**
-	 * Condition to await free capacity. This condition is signalled on both decrementing {@code count} and setting {@code closed} to {@code true}.
+	 * Condition to await free capacity. This condition is signalled on both decrementing {@code count} and setting {@code isShutdown} to {@code true}.
 	 */
 	private final Condition elementRemoved;
 	/**
-	 * Condition to await new elements. This condition is signalled on both incrementing {@code count} and setting {@code closed} to {@code true}.
+	 * Condition to await new elements. This condition is signalled on both incrementing {@code count} and setting {@code isShutdown} to {@code true}.
 	 */
 	private final Condition elementAdded;
 
@@ -165,7 +165,7 @@ public class BatchQueue<Request, Response> {
 
 		lock.lock();
 		try {
-			if (closed || count == items.length) {
+			if (isShutdown || count == items.length) {
 				return null;
 			}
 			future = enqueue0(request);
@@ -192,13 +192,13 @@ public class BatchQueue<Request, Response> {
 
 		lock.lockInterruptibly();
 		try {
-			while (!closed && count == items.length) {
+			while (!isShutdown && count == items.length) {
 				if (nanosToTimeout <= 0) {
 					return null;
 				}
 				nanosToTimeout = elementRemoved.awaitNanos(nanosToTimeout);
 			}
-			if (closed) {
+			if (isShutdown) {
 				return null;
 			}
 			future = enqueue0(request);
@@ -216,7 +216,7 @@ public class BatchQueue<Request, Response> {
 	public void shutdown() {
 		lock.lock();
 		try {
-			closed = true;
+			isShutdown = true;
 			// Signal all waiting threads: as the queue can only be emptied now, there's no need to wait for capacity nor wait for new elements.
 			elementRemoved.signal();
 			elementAdded.signal();
@@ -236,7 +236,7 @@ public class BatchQueue<Request, Response> {
 		final boolean result;
 		lock.lock();
 		try {
-			result = this.closed;
+			result = this.isShutdown;
 		} finally {
 			lock.unlock();
 		}
@@ -245,7 +245,7 @@ public class BatchQueue<Request, Response> {
 
 
 	/**
-	 * Check whether the batch queue has been shutdown completely. If so, calls to {@link #enqueue(Object)} and {@link #enqueue(Object, long, TimeUnit)} will
+	 * Check whether the batch queue has been shutdown and emptied. If so, calls to {@link #enqueue(Object)} and {@link #enqueue(Object, long, TimeUnit)} will
 	 * always return {@code null}, and calls to {@link #acquireBatch(long, TimeUnit, int, Collection)} will always return {@code false}.
 	 *
 	 * @return {@code true} if the queue has been shutdown and emptied, {@code true} otherwise
@@ -254,7 +254,7 @@ public class BatchQueue<Request, Response> {
 		final boolean result;
 		lock.lock();
 		try {
-			result = closed && count == 0;
+			result = isShutdown && count == 0;
 		} finally {
 			lock.unlock();
 		}
@@ -263,11 +263,11 @@ public class BatchQueue<Request, Response> {
 
 
 	/**
-	 * Wait up to the specified timeout for queue shutdown to complete.
+	 * Wait up to the specified timeout for {@link #isShutdownComplete()} to return {@code true}.
 	 *
 	 * @param timeout the maximum time to wait
 	 * @param unit    the unit of the parameter {@code timeout}
-	 * @return {@code true} if the queue was shut down within the timeout, {@code false} if not
+	 * @return {@code true} if the queue was shhutdown and emptied within the timeout, {@code false} if not
 	 * @throws InterruptedException if this thread was interrupted while waiting
 	 */
 	public boolean awaitShutdownComplete(final long timeout, final TimeUnit unit) throws InterruptedException {
@@ -319,8 +319,8 @@ public class BatchQueue<Request, Response> {
 		try {
 			int elementsInBatch = 0;
 			long nanosToTimeout = unit.toNanos(timeout);
-			while (elementsInBatch < maxElements && (count > 0 || !closed && nanosToTimeout >= 0)) {
-				while (!closed && count == 0 && nanosToTimeout > 0) {
+			while (elementsInBatch < maxElements && (count > 0 || !isShutdown && nanosToTimeout >= 0)) {
+				while (!isShutdown && count == 0 && nanosToTimeout > 0) {
 					nanosToTimeout = elementAdded.awaitNanos(nanosToTimeout);
 				}
 				if (count > 0) {
@@ -335,7 +335,7 @@ public class BatchQueue<Request, Response> {
 				}
 			}
 
-			canYieldMoreBatches = count > 0 || !closed;
+			canYieldMoreBatches = count > 0 || !isShutdown;
 		} finally {
 			lock.unlock();
 		}
