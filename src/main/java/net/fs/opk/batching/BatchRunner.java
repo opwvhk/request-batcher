@@ -72,9 +72,12 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 
 	/**
 	 * Create a batch runner that reads off a queue.
+     *
+     * <p>Note: the parameter {@code batchTimeoutMs} is meant to enforce that the {@code BatchRunner} will not hang. If your implementation alrady handles
+     * timeouts, set this to a value higher than your timeout.</p>
 	 *
 	 * @param queue          the batch queue to read
-	 * @param batchSize      the maximum number of elements in a bach
+	 * @param batchSize      the maximum number of elements in a batch
 	 * @param batchTimeoutMs the maximum time (in ms) to wait for the batch to produce results after
 	 *                       {@link #executeBatch(List) executeBatch(List&lt;BatchElement&lt;Request, Response&gt;&gt;)} has completed
 	 */
