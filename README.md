@@ -3,6 +3,7 @@
 For many systems, batching requests together amplifies throughput. This library takes care of the basics when batching multiple requests together. All you have to do is handle the batched requests.
 
 
+<!--
 ## Usage example
 
 In this (contrived) example, we'll batch number requests, and add the number of elements in the batch.
@@ -37,4 +38,4 @@ public class Example {
 }
 ````
 
-
+-->
