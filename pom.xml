@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
- 		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
- 		xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
-	<parent>
+    <parent>
         <groupId>net.sf.opk</groupId>
         <artifactId>opk-parent</artifactId>
-        <version>6-SNAPSHOT</version>
+        <version>6</version>
     </parent>
 
-	<groupId>com.bol.opwvhk</groupId>
-	<artifactId>request-batcher</artifactId>
-	<version>0.1-SNAPSHOT</version>
+    <artifactId>request-batcher</artifactId>
+    <version>0.1</version>
 
     <inceptionYear>2019</inceptionYear>
     <organization>
@@ -28,26 +27,36 @@
         </license>
     </licenses>
 
-    <properties>
-		<jdk.version>1.8</jdk.version>
-		<maven.compiler.source>${jdk.version}</maven.compiler.source>
-		<maven.compiler.target>${jdk.version}</maven.compiler.target>
-		<maven.compiler.testSource>${jdk.version}</maven.compiler.testSource>
-		<maven.compiler.testTarget>${jdk.version}</maven.compiler.testTarget>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-	</properties>
+    <scm>
+        <url>https://github.com/opwvhk/request-batcher</url>
+        <connection>scm:https://github.com/opwvhk/request-batcher.git</connection>
+        <developerConnection>scm:git@github.com:opwvhk/request-batcher.git</developerConnection>
+    </scm>
 
-	<dependencies>
-		<!-- Logging -->
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<version>1.7.21</version>
-		</dependency>
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-simple</artifactId>
-			<version>1.7.21</version>
+    <properties>
+        <!-- Build configurations -->
+        <targetJdkVersion>1.8</targetJdkVersion>
+        <defaultFileEncoding>UTF-8</defaultFileEncoding>
+        <maven.build.timestamp.format>yyyyMMdd.HHmmss</maven.build.timestamp.format>
+
+        <maven.compiler.source>${targetJdkVersion}</maven.compiler.source>
+        <maven.compiler.target>${targetJdkVersion}</maven.compiler.target>
+        <maven.compiler.testSource>${targetJdkVersion}</maven.compiler.testSource>
+        <maven.compiler.testTarget>${targetJdkVersion}</maven.compiler.testTarget>
+        <project.build.sourceEncoding>${defaultFileEncoding}</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <!-- Logging -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.21</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>1.7.21</version>
             <scope>test</scope>
 		</dependency>
 		<!-- Testing -->

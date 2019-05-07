@@ -5,7 +5,7 @@ For many systems, batching requests together amplifies throughput. This library 
 
 ## Usage example
 
-In this (contrived) example, we'll batch numbered requests, returning a description. In real scenario's, you'd 
+In this (contrived) example, we'll batch numbered requests, returning a description. In real scenario's, you'd perform a network call.
 
 ````java
 import net.fs.opk.batching.BatchQueue;
