@@ -12,16 +12,20 @@ import static java.util.Objects.requireNonNull;
 
 
 /**
- * A capacity limited queue to submit calls to that will be executed in batches. As such a process is inherently multithreaded, this queue can be shutdown
- * after which no new elements can be added. Shutdown is considered complete when the queue has been shutdown and emptied.
+ * A capacity limited queue to submit calls to that will be executed in batches. The queue is assumed to be consumed by one or more {@link BatchRunner}
+ * instances running in separate threads. As this is a multithreaded process, this queue can be shutdown after which no new elements can be added. Shutdown
+ * is considered complete when the queue has been shutdown and emptied.
  *
- * <p>Also, because the process is multithreaded, users specify timeouts. There are three of them:</p><ol>
+ * <h2>Throughput, latency and order</h2>
  *
- * <li>how long producing code is willing to wait for capaticy,</li>
- * <li>how long elements are willing to linger in the queue (this increases chances to batch items), and</li>
- * <li>how long consuming code is willing to wait for a first item</li>
+ * <p>In addition to method specific timeouts, elements on the queue also have a 'timeout': the linger time (specified when constructing the queue). This linger
+ * time specifies the amount of time an item on the queue is willing to wait for a batch to fill. When it expires, the item will be picked up in a batch as
+ * soon as possible. Larger linger times directly affect latency (it's the minimum latency for the first item in a batch) and increase the probability to
+ * batch multiple elements together, thus indirectly increasing throughput.</p>
  *
- * </ol>
+ * <p>The order of items on the queue is determined by the order the elements are added. This order is kept when consuming batches off the queue in a single
+ * thread, but not when consuming the queue with multiple threads: if the queue contains elements [A, B, C, D, E], two threads simultaniously acquiring a batch
+ * may receive the batches [A, C, D] and [B, E] respectively. To preserve this order, use one thread to consume batches and another to handle them.</p>
  *
  * <p>This queue does not implement {@link BlockingQueue} nor {@link Queue}, because it's not intended to be used as a {@link Collection}, but rather as a
  * bidirectional channel. This is also why {@link #enqueue(Object)} and {@link #enqueue(Object, long, TimeUnit)} return a {@link CompletableFuture}.</p>
@@ -329,6 +333,7 @@ public class BatchQueue<Request, Response> {
 					// Using dequeue0() because it preserves invariants, just in case adding to the collection throws
 					final BatchElement<Request, Response> element = dequeue0();
 					if (elementsInBatch == 0) {
+						// This is the first element in the batch, so now our timeout changes to the leftover linger time from the element
 						nanosToTimeout = element.getDeadlineNanos() - System.nanoTime();
 					}
 
