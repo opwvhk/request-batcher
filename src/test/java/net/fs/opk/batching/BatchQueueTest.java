@@ -1,14 +1,14 @@
 package net.fs.opk.batching;
 
-import java.util.*;
-import java.util.concurrent.*;
+import org.assertj.core.api.Condition;
+import org.junit.Test;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
-
-import net.fs.opk.batching.BatchElement;
-import net.fs.opk.batching.BatchQueue;
-import org.assertj.core.api.Condition;
-import org.junit.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -19,8 +19,8 @@ public class BatchQueueTest {
 	@Test(timeout = 300)
 	public void verifyInvariants() throws InterruptedException {
 		final Predicate<BatchQueue> testInvariants =
-				it -> it.count % it.items.length == (it.items.length + it.enqueueIndex - it.dequeueIndex) % it.items.length &&
-				      it.count == Stream.of(it.items).filter(Objects::nonNull).count();
+			it -> it.count % it.items.length == (it.items.length + it.enqueueIndex - it.dequeueIndex) % it.items.length &&
+				it.count == Stream.of(it.items).filter(Objects::nonNull).count();
 		final Condition<BatchQueue> validInvariants = new Condition<>(testInvariants, "has valid invariants");
 
 		final BatchQueue<String, String> queue = new BatchQueue<>(3, 10, TimeUnit.NANOSECONDS);
@@ -48,6 +48,7 @@ public class BatchQueueTest {
 		assertThat(batch).extracting(BatchElement::getInputValue).containsExactly("three", "four");
 		assertThat(queue).has(validInvariants).matches(q -> q.count == 0, "size");
 	}
+
 
 	@Test(timeout = 300)
 	public void verifyLimit() throws InterruptedException {

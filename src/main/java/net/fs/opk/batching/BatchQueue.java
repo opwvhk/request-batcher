@@ -2,7 +2,9 @@ package net.fs.opk.batching;
 
 import java.util.Collection;
 import java.util.Queue;
-import java.util.concurrent.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -27,25 +29,25 @@ import static java.util.Objects.requireNonNull;
 public class BatchQueue<Request, Response> {
 	/**
 	 * The queued items.
-	 *
+	 * <p>
 	 * (visible for testing because invariants can be tricky)
 	 */
 	final Object[] items;
 	/**
 	 * The index for the next enqueue action.
-	 *
+	 * <p>
 	 * (visible for testing because invariants can be tricky)
 	 */
 	int enqueueIndex;
 	/**
 	 * The index for the next dequeue action.
-	 *
+	 * <p>
 	 * (visible for testing because invariants can be tricky)
 	 */
 	int dequeueIndex;
 	/**
 	 * The number of elements in the queue.
-	 *
+	 * <p>
 	 * (visible for testing because invariants can be tricky)
 	 */
 	int count;
@@ -293,7 +295,7 @@ public class BatchQueue<Request, Response> {
 	/**
 	 * Acquire a batch of items from the queue. Waits up to the specified timeout for items to become available, and up to the specified linger time for a
 	 * second item to become available. It returns after that, after having placed at most {@code maxElements} elements in the specified collection.
-	 *
+	 * <p>
 	 * This means that this method lingers for at most {@code linger} {@code unit}s after it has acquired an item from the queue.
 	 *
 	 * @param timeout     the maximum amount of time to wait for a first item to become available
@@ -304,7 +306,7 @@ public class BatchQueue<Request, Response> {
 	 * @throws InterruptedException when the current thread was interrupted while waiting
 	 */
 	public boolean acquireBatch(final long timeout, final TimeUnit unit, final int maxElements, final Collection<BatchElement<Request, Response>> collection)
-			throws InterruptedException {
+		throws InterruptedException {
 		if (timeout < 0) {
 			throw new IllegalArgumentException("timeout must be non-negative");
 		}

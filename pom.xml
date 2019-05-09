@@ -2,62 +2,62 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+	<modelVersion>4.0.0</modelVersion>
 
-    <parent>
-        <groupId>net.sf.opk</groupId>
-        <artifactId>opk-parent</artifactId>
-        <version>6</version>
-    </parent>
+	<parent>
+		<groupId>net.sf.opk</groupId>
+		<artifactId>opk-parent</artifactId>
+		<version>6</version>
+	</parent>
 
-    <artifactId>request-batcher</artifactId>
-    <version>0.1</version>
+	<artifactId>request-batcher</artifactId>
+	<version>0.1</version>
 
-    <inceptionYear>2019</inceptionYear>
-    <organization>
-        <!-- Not really an organization, but the owner of the copyrights. -->
-        <name>Oscar Westra van Holthe - Kind</name>
-        <url>http://oscar.westravanholthe.nl/</url>
-    </organization>
-    <licenses>
-        <license>
-            <name>MIT License</name>
-            <url>https://opensource.org/licenses/MIT</url>
-            <distribution>repo</distribution>
-        </license>
-    </licenses>
+	<inceptionYear>2019</inceptionYear>
+	<organization>
+		<!-- Not really an organization, but the owner of the copyrights. -->
+		<name>Oscar Westra van Holthe - Kind</name>
+		<url>http://oscar.westravanholthe.nl/</url>
+	</organization>
+	<licenses>
+		<license>
+			<name>MIT License</name>
+			<url>https://opensource.org/licenses/MIT</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
 
-    <scm>
-        <url>https://github.com/opwvhk/request-batcher</url>
-        <connection>scm:https://github.com/opwvhk/request-batcher.git</connection>
-        <developerConnection>scm:git@github.com:opwvhk/request-batcher.git</developerConnection>
-    </scm>
+	<scm>
+		<url>https://github.com/opwvhk/request-batcher</url>
+		<connection>scm:https://github.com/opwvhk/request-batcher.git</connection>
+		<developerConnection>scm:git@github.com:opwvhk/request-batcher.git</developerConnection>
+	</scm>
 
-    <properties>
-        <!-- Build configurations -->
-        <targetJdkVersion>1.8</targetJdkVersion>
-        <defaultFileEncoding>UTF-8</defaultFileEncoding>
-        <maven.build.timestamp.format>yyyyMMdd.HHmmss</maven.build.timestamp.format>
+	<properties>
+		<!-- Build configurations -->
+		<targetJdkVersion>1.8</targetJdkVersion>
+		<defaultFileEncoding>UTF-8</defaultFileEncoding>
+		<maven.build.timestamp.format>yyyyMMdd.HHmmss</maven.build.timestamp.format>
 
-        <maven.compiler.source>${targetJdkVersion}</maven.compiler.source>
-        <maven.compiler.target>${targetJdkVersion}</maven.compiler.target>
-        <maven.compiler.testSource>${targetJdkVersion}</maven.compiler.testSource>
-        <maven.compiler.testTarget>${targetJdkVersion}</maven.compiler.testTarget>
-        <project.build.sourceEncoding>${defaultFileEncoding}</project.build.sourceEncoding>
-    </properties>
+		<maven.compiler.source>${targetJdkVersion}</maven.compiler.source>
+		<maven.compiler.target>${targetJdkVersion}</maven.compiler.target>
+		<maven.compiler.testSource>${targetJdkVersion}</maven.compiler.testSource>
+		<maven.compiler.testTarget>${targetJdkVersion}</maven.compiler.testTarget>
+		<project.build.sourceEncoding>${defaultFileEncoding}</project.build.sourceEncoding>
+	</properties>
 
-    <dependencies>
-        <!-- Logging -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>1.7.21</version>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>1.7.21</version>
-            <scope>test</scope>
+	<dependencies>
+		<!-- Logging -->
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>1.7.21</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-simple</artifactId>
+			<version>1.7.21</version>
+			<scope>test</scope>
 		</dependency>
 		<!-- Testing -->
 		<dependency>
@@ -79,4 +79,16 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
+
+	<distributionManagement>
+		<snapshotRepository>
+			<id>ossrh</id>
+			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
+		</snapshotRepository>
+		<repository>
+			<id>ossrh</id>
+			<url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+		</repository>
+		<site/>
+	</distributionManagement>
 </project>

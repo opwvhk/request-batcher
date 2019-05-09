@@ -1,14 +1,17 @@
 package net.fs.opk.batching;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -38,9 +41,9 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 	 * @param demuxer        a consumer that demultiplexes a batch response into the batch elements
 	 */
 	public static <Request, BatchedRequest, BatchedResponse, Response> BatchRunner<Request, Response> forLambdas(final BatchQueue<Request, Response> queue,
-			final int batchSize, final long batchTimeoutMs, final Function<List<Request>, BatchedRequest> muxer,
-			final Function<BatchedRequest, CompletableFuture<BatchedResponse>> batchFunction,
-			final BiConsumer<BatchedResponse, List<BatchElement<Request, Response>>> demuxer) {
+	                                                                                                             final int batchSize, final long batchTimeoutMs, final Function<List<Request>, BatchedRequest> muxer,
+	                                                                                                             final Function<BatchedRequest, CompletableFuture<BatchedResponse>> batchFunction,
+	                                                                                                             final BiConsumer<BatchedResponse, List<BatchElement<Request, Response>>> demuxer) {
 		return new BatchRunner<Request, Response>(queue, batchSize, batchTimeoutMs) {
 			@Override
 			protected void executeBatch(final List<BatchElement<Request, Response>> batch) {
@@ -54,7 +57,7 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 
 					// Just in case the demuxer didn't complete all requests.
 					final List<BatchElement<Request, Response>> unhandledElements =
-							batch.stream().filter(element -> !element.outputFuture.isDone()).collect(Collectors.toList());
+						batch.stream().filter(element -> !element.outputFuture.isDone()).collect(Collectors.toList());
 					if (!unhandledElements.isEmpty()) {
 						final Exception error = new IllegalStateException("The batch call didn't yield a value...");
 						for (final BatchElement<Request, Response> element : unhandledElements) {
@@ -72,9 +75,9 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 
 	/**
 	 * Create a batch runner that reads off a queue.
-     *
-     * <p>Note: the parameter {@code batchTimeoutMs} is meant to enforce that the batched calls will not hang. If your implementation already handles
-     * timeouts, set this to a value higher than your timeout.</p>
+	 *
+	 * <p>Note: the parameter {@code batchTimeoutMs} is meant to enforce that the batched calls will not hang. If your implementation already handles
+	 * timeouts, set this to a value higher than your timeout.</p>
 	 *
 	 * @param queue          the batch queue to read
 	 * @param batchSize      the maximum number of elements in a batch
@@ -112,8 +115,8 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 
 	/**
 	 * Try a single batch call. This method waits a short time for a batch to fill, and then up to the specified linger time for more elements (less if the
-     * first element was already waiting when this method started). Then, if there are any elements, calls
-     * {@link #executeBatch(List) executeBatch(List&lt;BatchElement&lt;Request, Response&gt;&gt;)}.
+	 * first element was already waiting when this method started). Then, if there are any elements, calls
+	 * {@link #executeBatch(List) executeBatch(List&lt;BatchElement&lt;Request, Response&gt;&gt;)}.
 	 *
 	 * @return {@code true} if this method should be called again, {@code false} if the queue has shut down and is empty.
 	 * @throws InterruptedException if this thread was interrupted while waiting
