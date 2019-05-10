@@ -1,6 +1,7 @@
 package net.fs.opk.batching;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 
 
@@ -64,5 +65,15 @@ public class BatchElement<T, R> {
 	 */
 	public void error(final Throwable error) {
 		outputFuture.completeExceptionally(error);
+	}
+
+
+	/**
+	 * Report the result of the given {@code CompletionStage} as result of this batch element.
+	 *
+	 * @param result the (eventul) result for the batch element
+	 */
+	public void report(final CompletionStage<R> result) {
+		result.thenApply(outputFuture::complete).exceptionally(outputFuture::completeExceptionally);
 	}
 }
