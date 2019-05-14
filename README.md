@@ -1,6 +1,7 @@
 # Request Batcher
 
-For many systems, batching requests together amplifies throughput. This library takes care of the basics when batching multiple requests together. All you have to do is handle the batched requests.
+For many systems, batching requests together amplifies throughput. This library takes care of the basics when batching multiple requests together. All you 
+have to do is handle the batched requests.
 
 
 ## Usage example
