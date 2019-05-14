@@ -35,7 +35,7 @@
 
 	<properties>
 		<!-- Build configurations -->
-		<targetJdkVersion>1.8</targetJdkVersion>
+		<targetJdkVersion>11</targetJdkVersion>
 		<defaultFileEncoding>UTF-8</defaultFileEncoding>
 		<maven.build.timestamp.format>yyyyMMdd.HHmmss</maven.build.timestamp.format>
 

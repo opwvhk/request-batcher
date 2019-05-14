@@ -10,7 +10,7 @@ In this (contrived) example, we'll batch numbered requests, returning a descript
 ````java
 import net.fs.opk.batching.BatchQueue;
 import net.fs.opk.batching.BatchElement;
-import net.fs.opk.batching.BatchRunner;
+import net.fs.opk.batching.BatchRunnerFactory;
 
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -26,7 +26,13 @@ public class Example {
         BatchQueue<Integer, String> batchQueue = new BatchQueue<>(10_000, 1, MILLISECONDS);
 
         ExecutorService executor = Executors.newFixedThreadPool(1);
-        executor.execute(new MyBatchRunner(batchQueue));
+        executor.execute(BatchRunnerFactory.forConsumer(batchQueue, 5, batch -> {
+	        // Here, you'd probably implement a call to a bulk API...
+	        String suffix = " with " + (batch.size() - 1) + " other elements";
+	        for (BatchElement<Integer, String> element : batch) {
+	            element.success("Batched " + element.getInputValue() + suffix);
+	        }
+        }));
 
 
         // Step 2 (using): use the queue to batch requests
@@ -46,20 +52,6 @@ public class Example {
         // Optional: wait until the queue is empty and the BatchRunner has terminated.
         batchQueue.awaitShutdownComplete(100, MILLISECONDS);
         executor.awaitTermination(1, MILLISECONDS);
-    }
-}
-
-class MyBatchRunner extends BatchRunner<Integer, String> {
-    MyBatchRunner(BatchQueue<Integer, String> queue) {
-        super(queue, 5, 100);
-    }
-
-    protected void executeBatch(final List<BatchElement<Integer, String>> batch) {
-        // Here, you'd probably implement a call to a bulk API...
-        String suffix = " with " + (batch.size() - 1) + " other elements";
-        for (BatchElement<Integer, String> element : batch) {
-            element.success("Batched " + element.getInputValue() + suffix);
-        }
     }
 }
 ````
