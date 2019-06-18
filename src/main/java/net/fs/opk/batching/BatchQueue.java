@@ -36,7 +36,7 @@ public class BatchQueue<Request, Response> {
 	 * <p>
 	 * (visible for testing because invariants can be tricky)
 	 */
-	final Object[] items;
+	final BatchElement[] items;
 	/**
 	 * The index for the next enqueue action.
 	 * <p>
@@ -102,7 +102,7 @@ public class BatchQueue<Request, Response> {
 		if (unit.toNanos(linger) < 0 || unit.toNanos(linger) == Long.MAX_VALUE) {
 			throw new IllegalArgumentException("The linger time must be non-negative and less than 2^63 ns (approx. 292 years)");
 		}
-		items = new Object[capacity];
+		items = new BatchElement[capacity];
 		enqueueIndex = 0;
 		dequeueIndex = 0;
 		count = 0;
