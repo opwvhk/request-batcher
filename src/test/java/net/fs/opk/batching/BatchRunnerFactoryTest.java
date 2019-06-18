@@ -5,13 +5,17 @@ import org.junit.Test;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.Mockito.*;
 
 
@@ -139,18 +143,27 @@ public class BatchRunnerFactoryTest {
 		final AtomicInteger errors = new AtomicInteger(0);
 		final int maxConcurrentBatches = 5;
 		final ScheduledExecutorService pool = Executors.newScheduledThreadPool(2 * maxConcurrentBatches);
-		BatchRunnerFactory.forConsumer(largeQueue, 1, maxConcurrentBatches, 1, TimeUnit.SECONDS, batch -> {
+		BatchRunnerFactory.forConsumer(largeQueue, 2, maxConcurrentBatches, 1, TimeUnit.SECONDS, batch -> {
 			counter.incrementAndGet();
 			pool.schedule(() -> {
 				final int concurrent = counter.getAndDecrement();
 				if (concurrent > maxConcurrentBatches) {
 					errors.incrementAndGet();
 				}
-				batch.get(0).success(concurrent);
+				batch.forEach(e -> e.success(concurrent));
 			}, 10, TimeUnit.MILLISECONDS);
 		}).run();
 
 		assertThat(errors).hasValue(0);
+	}
+
+
+	@Test(timeout = 20_100)
+	public void verifyEmptyBatch() {
+		final BatchQueue<Integer, Integer> queue = new BatchQueue<>(1, 1, TimeUnit.SECONDS);
+		queue.shutdown();
+
+		BatchRunnerFactory.forConsumer(queue, 2, 5, 1, TimeUnit.SECONDS, batch -> fail("There is no batch.")).run();
 	}
 
 
