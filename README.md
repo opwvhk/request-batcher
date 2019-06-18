@@ -1,12 +1,14 @@
 # Request Batcher
 
-For many systems, batching requests together amplifies throughput. This library takes care of the basics when batching multiple requests together. All you 
-have to do is handle the batched requests.
+When dealing with a remote requests, request overhead can be significant. Especially for high request volumes.
+
+But for high volumes, it's often possible (desirable even) to trade a bit of extra latency for a (much) higher throughput. This can be done by batching 
+multiple requests together. This library takes care of the lowlevel stuff around that. All you have to do is handle the batched requests.
 
 
 ## Usage example
 
-In this (contrived) example, we'll batch numbered requests, returning a description. In real scenario's, you'd perform a network call.
+In this (contrived) example we'll batch numbered requests, returning a description. In real scenario's you'd perform a network call.
 
 ````java
 import net.fs.opk.batching.BatchQueue;
@@ -49,9 +51,10 @@ public class Example {
         // (after that, the BatchRunner will stop itself when the queue is empty)
 
         batchQueue.shutdown();
-        executor.shutdown();
         // Optional: wait until the queue is empty and the BatchRunner has terminated.
         batchQueue.awaitShutdownComplete(100, MILLISECONDS);
+		// Optional: shutdown the executor if you used a dedicated one.
+        executor.shutdown();
         executor.awaitTermination(1, MILLISECONDS);
     }
 }
