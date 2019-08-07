@@ -17,8 +17,8 @@ import java.util.stream.Collectors;
  */
 public class BatchRunnerFactory {
 	/**
-	 * Create a batch runner for a batch consumer (starter), to run potentially infinite batches simultaneously. If your batch consumer completely handles the
-	 * batch, there will only be one batch executed at a time.
+	 * Create a batch runner for a batch consumer (starter), to run potentially infinite batches simultaneously. If your batch consumer blocks until the batch
+	 * is handled, there will only be one batch executed at a time.
 	 *
 	 * @param queue        the queue to read batcheds off of
 	 * @param batchSize    the maximum size of a batch
@@ -29,7 +29,7 @@ public class BatchRunnerFactory {
 	                                                                             Consumer<List<BatchElement<Request, Response>>> batchStarter) {
 		return new BatchRunner<>(queue, batchSize) {
 			@Override
-			protected void startBatch(final List<BatchElement<Request, Response>> batch) {
+			protected void startRequest(final List<BatchElement<Request, Response>> batch) {
 				batchStarter.accept(batch);
 			}
 		};
@@ -37,8 +37,9 @@ public class BatchRunnerFactory {
 
 
 	/**
-	 * Create a batch runner for a batch consumer (starter), to run a limited number of potentially infinite batches simultaneously. Your batch consumer must
-	 * not block, or else there will only be one batch executed at a time.
+	 * Create a batch runner for a batch consumer (starter), to run a limited number of batches simultaneously. Your batch consumer must not block, or else
+	 * there will only be one batch executed at a time. Also note that {@code batchTimeout} does not cancel the batch: it only times out the batch elements and
+	 * allows a new batch to start.
 	 *
 	 * @param queue                the queue to read batcheds off of
 	 * @param batchSize            the maximum size of a batch
@@ -61,7 +62,7 @@ public class BatchRunnerFactory {
 
 
 			@Override
-			protected void startBatch(final List<BatchElement<Request, Response>> batch) {
+			protected void startRequest(final List<BatchElement<Request, Response>> batch) {
 				final AtomicInteger counter = new AtomicInteger(batch.size());
 				batch.forEach(element -> element.outputFuture.orTimeout(batchTimeout, unit).whenComplete((ignored1, ignored2) -> {
 					if (counter.decrementAndGet() == 0) {
@@ -73,7 +74,7 @@ public class BatchRunnerFactory {
 
 
 			@Override
-			protected void noBatch() {
+			protected void noRequest() {
 				semaphore.release();
 			}
 		};
