@@ -10,8 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Class to start batched requests off a {@link BatchQueue}. Subclasses must at least implement
- * {@link #startRequest(List) startRequest(List&lt;BatchElement&lt;Request, Response&gt;&gt;)}, but may override {@link #preBatch()} and/or {@link #noRequest()} if
- * required.
+ * {@link #startRequest(List) startRequest(List&lt;BatchElement&lt;Request, Response&gt;&gt;)}, but may also override {@link #preBatch()}.
  *
  * <p>Implementation note: when running, the call sequence is always</p><ol>
  *
@@ -19,9 +18,7 @@ import java.util.concurrent.TimeUnit;
  *
  * <li>acquire a batch from the queue</li>
  *
- * <li>{@code noRequest()} (if the queue was empty)</li>
- *
- * <li>{@code startRequest(List<BatchElement<Request, Response>>)} (if the queue was not empty)</li>
+ * <li>{@code startRequest(List<BatchElement<Request, Response>>)} (with an empty list if the queue was empty)</li>
  *
  * </ol>
  */
@@ -90,9 +87,9 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 
 
 	/**
-	 * Try a single batch request. This method waits a short time for a batch to fill, and then up to the specified linger time for more elements (less if the
-	 * first element was already waiting when this method started). Then, depending whether there are any elements, calls {@link #noRequest()} (if none) or
-	 * {@link #startRequest(List) startRequest(List&lt;BatchElement&lt;Request, Response&gt;&gt;)} (otherwise).
+	 * Try a single batch request. This method waits a short time for a batch to fill, and then up to the specified linger time for more
+	 * elements (less if the first element was already waiting when this method started). Then calls
+	 * {@link #startRequest(List) startRequest(List&lt;BatchElement&lt;Request, Response&gt;&gt;)}.
 	 *
 	 * @return {@code true} if this method should be called again, {@code false} if the queue has shut down and is empty.
 	 * @throws InterruptedException if this thread was interrupted while waiting
@@ -102,14 +99,10 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 
 		final List<BatchElement<Request, Response>> batch = new ArrayList<>(batchSize);
 		final boolean keepRunning = queue.acquireBatch(batchTimeout, batchTimeoutUnit, batchSize, batch);
-		if (batch.isEmpty()) {
-			noRequest();
-		} else {
-			try {
-				startRequest(batch);
-			} catch (final Throwable error) {
-				batch.forEach(element -> element.error(error));
-			}
+		try {
+			startRequest(batch);
+		} catch (final Throwable error) {
+			batch.forEach(element -> element.error(error));
 		}
 		return keepRunning;
 	}
@@ -118,8 +111,8 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 	/**
 	 * Method that is called every time just before polling the queue for a new batch of elements.
 	 *
-	 * <p>After every call to this method, either {@link #noRequest()} or {@link #startRequest(List) startRequest(List&lt;BatchElement&lt;Request, Response&gt;&gt;)}
-	 * is called.</p>
+	 * <p>After every call to this method {@link #startRequest(List) startRequest(List&lt;BatchElement&lt;Request, Response&gt;&gt;)} is
+	 * called.</p>
 	 *
 	 * <p><strong>Note:</strong> if this method throws, the batch runner shuts down.</p>
 	 */
@@ -131,24 +124,11 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 	/**
 	 * Start to execute a batch of elements, reporting their results eventually.
 	 *
-	 * <p>This method is called for every batch, after {@link #preBatch()} is called. If the queue was empty, {@link #noRequest()} is called instead.</p>
+	 * <p>This method is called for every batch, after {@link #preBatch()} is called. If the queue was empty, the list will be empty.</p>
 	 *
-	 * <p>Note: if this method throws, the exception is pased to the batch elements and the batch runner keeps running.</p>
+	 * <p>Note: if this method throws, the exception is passed to the batch elements and the batch runner keeps running.</p>
 	 *
 	 * @param batch the batch of elements
 	 */
 	protected abstract void startRequest(final List<BatchElement<Request, Response>> batch) throws Exception;
-
-
-	/**
-	 * Method that is called every time the request queue is empty.
-	 *
-	 * <p>This method is called for every batch, after {@link #preBatch()} is called. If the queue was not empty,
-	 * {@link #startRequest(List) startRequest(List&lt;BatchElement&lt;Request, Response&gt;&gt;)} is called instead.</p>
-	 *
-	 * <p><strong>Note:</strong> if this method throws, the batch runner shuts down.</p>
-	 */
-	protected void noRequest() throws Exception {
-		// Default implementation: do nothing
-	}
 }

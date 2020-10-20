@@ -1,3 +1,4 @@
+# Maven
 target/
 pom.xml.tag
 pom.xml.releaseBackup
@@ -6,5 +7,10 @@ pom.xml.next
 release.properties
 dependency-reduced-pom.xml
 buildNumber.properties
+
+# IntelliJ
 .idea/
+*.iml
+
+#Other
 oscar.westravanholthe.nl/

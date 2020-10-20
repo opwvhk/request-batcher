@@ -47,7 +47,7 @@ public class LimitedListTest {
 		list.add(ONE);
 		list.add(TWO);
 
-		//noinspection ResultOfMethodCallIgnored,ConstantConditions
+		//noinspection ResultOfMethodCallIgnored
 		assertThatThrownBy(() -> list.get(-1)).isInstanceOf(IndexOutOfBoundsException.class);
 		//noinspection ResultOfMethodCallIgnored
 		assertThatThrownBy(() -> list.get(2)).isInstanceOf(IndexOutOfBoundsException.class);
@@ -65,6 +65,7 @@ public class LimitedListTest {
 
 		list.clear();
 
+		//noinspection ConstantConditions
 		assertThat(list.size()).isEqualTo(0);
 		assertThat(list.capacity()).isEqualTo(CAPACITY);
 	}

@@ -36,7 +36,7 @@ public class BatchElementTest {
 
 
 	@Test
-	public void verifySucces() {
+	public void verifySuccess() {
 		final BatchElement<Integer, Integer> element = new BatchElement<>(deadlineNanos, inputValue);
 
 		element.success(outputValue);
@@ -54,7 +54,7 @@ public class BatchElementTest {
 
 
 	@Test
-	public void verifyEventualSucces() {
+	public void verifyEventualSuccess() {
 		final BatchElement<Integer, Integer> element = new BatchElement<>(deadlineNanos, inputValue);
 		element.report(CompletableFuture.completedFuture(outputValue));
 

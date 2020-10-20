@@ -18,10 +18,10 @@ public class BatchQueueTest {
 
 	@Test(timeout = 300)
 	public void verifyInvariants() throws InterruptedException {
-		final Predicate<BatchQueue> testInvariants =
+		final Predicate<BatchQueue<String, String>> testInvariants =
 			it -> it.count % it.items.length == (it.items.length + it.enqueueIndex - it.dequeueIndex) % it.items.length &&
 				it.count == Stream.of(it.items).filter(Objects::nonNull).count();
-		final Condition<BatchQueue> validInvariants = new Condition<>(testInvariants, "has valid invariants");
+		final Condition<BatchQueue<String, String>> validInvariants = new Condition<>(testInvariants, "has valid invariants");
 
 		final BatchQueue<String, String> queue = new BatchQueue<>(3, 10, TimeUnit.NANOSECONDS);
 		assertThat(queue).has(validInvariants).matches(q -> q.count == 0, "size");

@@ -27,7 +27,7 @@ import static java.util.Objects.requireNonNull;
  * batch multiple elements together, thus indirectly increasing throughput.</p>
  *
  * <p>The order of items on the queue is determined by the order the elements are added. This order is kept when consuming batches off the queue using a single
- * thread, but not when consuming the queue with multiple threads: if the queue contains elements [A, B, C, D, E], two threads simultaniously acquiring a batch
+ * thread, but not when consuming the queue with multiple threads: if the queue contains elements [A, B, C, D, E], two threads simultaneously acquiring a batch
  * may receive the batches [A, C, D] and [B, E] respectively.</p>
  */
 public class BatchQueue<Request, Response> {
@@ -36,7 +36,7 @@ public class BatchQueue<Request, Response> {
 	 * <p>
 	 * (visible for testing because invariants can be tricky)
 	 */
-	final BatchElement[] items;
+	final BatchElement<Request, Response>[] items;
 	/**
 	 * The index for the next enqueue action.
 	 * <p>
@@ -102,7 +102,7 @@ public class BatchQueue<Request, Response> {
 		if (unit.toNanos(linger) < 0 || unit.toNanos(linger) == Long.MAX_VALUE) {
 			throw new IllegalArgumentException("The linger time must be non-negative and less than 2^63-1 ns (approx. 292 years)");
 		}
-		items = new BatchElement[capacity];
+		items = (BatchElement<Request, Response>[]) new BatchElement[capacity];
 		enqueueIndex = 0;
 		dequeueIndex = 0;
 		count = 0;
@@ -146,7 +146,7 @@ public class BatchQueue<Request, Response> {
 	private BatchElement<Request, Response> dequeue0() {
 		// Assumes we hold the lock and count > 0 (and thus that items[dequeueIndex] != null)
 
-		final BatchElement<Request, Response> x = (BatchElement<Request, Response>)items[dequeueIndex];
+		final BatchElement<Request, Response> x = items[dequeueIndex];
 		items[dequeueIndex] = null;
 
 		dequeueIndex++;
@@ -273,7 +273,7 @@ public class BatchQueue<Request, Response> {
 	 *
 	 * @param timeout the maximum time to wait
 	 * @param unit    the unit of the parameter {@code timeout}
-	 * @return {@code true} if the queue was shhutdown and emptied within the timeout, {@code false} if not
+	 * @return {@code true} if the queue was shutdown and emptied within the timeout, {@code false} if not
 	 * @throws InterruptedException if this thread was interrupted while waiting
 	 */
 	public boolean awaitShutdownComplete(final long timeout, final TimeUnit unit) throws InterruptedException {

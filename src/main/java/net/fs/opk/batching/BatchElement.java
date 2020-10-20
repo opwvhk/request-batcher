@@ -71,7 +71,7 @@ public class BatchElement<T, R> {
 	/**
 	 * Report the result of the given {@code CompletionStage} as result of this batch element.
 	 *
-	 * @param result the (eventul) result for the batch element
+	 * @param result the (eventual) result for the batch element
 	 */
 	public void report(final CompletionStage<R> result) {
 		result.thenApply(outputFuture::complete).exceptionally(outputFuture::completeExceptionally);

@@ -40,7 +40,7 @@ public class BatchRunnerFactoryTest {
 
 		queue = (BatchQueue<String, String>)mock(BatchQueue.class);
 		when(queue.acquireBatch(anyLong(), any(TimeUnit.class), anyInt(), anyCollection())).thenAnswer(invocation -> {
-			assertThat((TimeUnit)invocation.getArgument(1)).isEqualTo(TimeUnit.MILLISECONDS);
+			assertThat((TimeUnit)invocation.getArgument(1)).isEqualTo(TimeUnit.SECONDS);
 			assertThat((Integer)invocation.getArgument(2)).isEqualTo(BATCH_SIZE);
 			final Collection<BatchElement<String, String>> batch = (Collection<BatchElement<String, String>>)invocation.getArgument(3, Collection.class);
 			switch (counter.getAndDecrement()) {
@@ -74,7 +74,7 @@ public class BatchRunnerFactoryTest {
 
 		runner.run();
 
-		verify(queue, times(3)).acquireBatch(anyLong(), eq(TimeUnit.MILLISECONDS), anyInt(), anyCollection());
+		verify(queue, times(3)).acquireBatch(anyLong(), eq(TimeUnit.SECONDS), anyInt(), anyCollection());
 
 		assertThat(e1.outputFuture).isCompletedWithValue("[one]");
 		assertThat(e2.outputFuture).isCompletedWithValue("[two]");
@@ -91,7 +91,7 @@ public class BatchRunnerFactoryTest {
 
 		runner.run();
 
-		verify(queue, times(3)).acquireBatch(anyLong(), eq(TimeUnit.MILLISECONDS), anyInt(), anyCollection());
+		verify(queue, times(3)).acquireBatch(anyLong(), eq(TimeUnit.SECONDS), anyInt(), anyCollection());
 
 		assertThat(e1.outputFuture).hasFailedWithThrowableThat().isSameAs(error);
 		assertThat(e2.outputFuture).hasFailedWithThrowableThat().isSameAs(error);
