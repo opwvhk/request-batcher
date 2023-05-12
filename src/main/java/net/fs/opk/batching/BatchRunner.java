@@ -1,11 +1,11 @@
 package net.fs.opk.batching;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -35,14 +35,14 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 
 
 	/**
-	 * Create a batch runner that reads off a queue, using a 5 second timeout when acquiring a batch.
+	 * Create a batch runner that reads off a queue, using a 5-second timeout when acquiring a batch.
 	 *
 	 * @param queue     the batch queue to read
 	 * @param batchSize the maximum number of elements in a batch
 	 * @see BatchQueue#acquireBatch(long, TimeUnit, int, java.util.Collection)
 	 * BatchQueue.acquireBatch(long, TimeUnit, int, Collection&lt;BatchElement&lt;Request, Response&gt;&gt;)
 	 */
-	protected BatchRunner(final BatchQueue<Request, Response> queue, final int batchSize) {
+	protected BatchRunner(BatchQueue<Request, Response> queue, int batchSize) {
 		this(queue, batchSize, 5, TimeUnit.SECONDS);
 	}
 
@@ -57,7 +57,7 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 	 * @see BatchQueue#acquireBatch(long, TimeUnit, int, java.util.Collection)
 	 * BatchQueue.acquireBatch(long, TimeUnit, int, Collection&lt;BatchElement&lt;Request, Response&gt;&gt;)
 	 */
-	protected BatchRunner(final BatchQueue<Request, Response> queue, final int batchSize, final long batchTimeout, final TimeUnit batchTimeoutUnit) {
+	protected BatchRunner(BatchQueue<Request, Response> queue, int batchSize, long batchTimeout, TimeUnit batchTimeoutUnit) {
 		this.queue = queue;
 		this.batchSize = batchSize;
 		this.batchTimeout = batchTimeout;
@@ -66,8 +66,7 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 
 
 	/**
-	 * Repeatedly get a batch from the queue and execute it. Stops when the queue has shut down and is empty or when the
-	 * current thread is interrupted.
+	 * Repeatedly get a batch from the queue and execute it. Stops when the queue has shut down and is empty or when the current thread is interrupted.
 	 */
 	@Override
 	public void run() {
@@ -78,17 +77,17 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 				continueRunning = tryBatchRequest();
 			}
 			LOGGER.info("BatchRunner stopping because queue is shutdown and empty.");
-		} catch (final InterruptedException ignored) {
+		} catch (InterruptedException ignored) {
 			LOGGER.info("BatchRunner stopping because its thread was interrupted.");
-		} catch (final Throwable error) {
+		} catch (Throwable error) {
 			LOGGER.error("BatchRunner stopping abnormally", error);
 		}
 	}
 
 
 	/**
-	 * Try a single batch request. This method waits a short time for a batch to fill, and then up to the specified linger time for more
-	 * elements (less if the first element was already waiting when this method started). Then calls
+	 * Try a single batch request. This method waits for a short time for a batch to fill, and then up to the specified linger time for more elements (less if
+	 * the first element was already waiting when this method started). Then calls
 	 * {@link #startRequest(List) startRequest(List&lt;BatchElement&lt;Request, Response&gt;&gt;)}.
 	 *
 	 * @return {@code true} if this method should be called again, {@code false} if the queue has shut down and is empty.
@@ -97,11 +96,11 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 	private boolean tryBatchRequest() throws Exception {
 		preBatch();
 
-		final List<BatchElement<Request, Response>> batch = new ArrayList<>(batchSize);
-		final boolean keepRunning = queue.acquireBatch(batchTimeout, batchTimeoutUnit, batchSize, batch);
+		List<BatchElement<Request, Response>> batch = new ArrayList<>(batchSize);
+		boolean keepRunning = queue.acquireBatch(batchTimeout, batchTimeoutUnit, batchSize, batch);
 		try {
 			startRequest(batch);
-		} catch (final Throwable error) {
+		} catch (Throwable error) {
 			batch.forEach(element -> element.error(error));
 		}
 		return keepRunning;
@@ -111,8 +110,7 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 	/**
 	 * Method that is called every time just before polling the queue for a new batch of elements.
 	 *
-	 * <p>After every call to this method {@link #startRequest(List) startRequest(List&lt;BatchElement&lt;Request, Response&gt;&gt;)} is
-	 * called.</p>
+	 * <p>After every call to this method {@link #startRequest(List) startRequest(List&lt;BatchElement&lt;Request, Response&gt;&gt;)} is called.</p>
 	 *
 	 * <p><strong>Note:</strong> if this method throws, the batch runner shuts down.</p>
 	 */
@@ -130,5 +128,5 @@ public abstract class BatchRunner<Request, Response> implements Runnable {
 	 *
 	 * @param batch the batch of elements
 	 */
-	protected abstract void startRequest(final List<BatchElement<Request, Response>> batch) throws Exception;
+	protected abstract void startRequest(List<BatchElement<Request, Response>> batch) throws Exception;
 }

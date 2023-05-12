@@ -1,25 +1,29 @@
 package net.fs.opk.batching;
 
-import org.junit.Before;
-import org.junit.Test;
-
+import java.time.Duration;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 
-public class BatchElementTest {
-	private long deadlineNanos;
+class BatchElementTest {
+	private static final long NANOS_FOR_365_DAYS = 31536000000000000L;
+	private long lingerDeadlineNanos;
+	private long completionDeadlineNanos;
 	private Integer inputValue;
 	private Integer outputValue;
 	private RuntimeException error;
 
 
-	@Before
-	public void setUp() {
-		final Random random = new Random();
-		deadlineNanos = random.nextLong();
+	@BeforeEach
+	void setUp() {
+		Random random = new Random();
+		lingerDeadlineNanos = random.nextLong(0, NANOS_FOR_365_DAYS);
+		completionDeadlineNanos = random.nextLong(lingerDeadlineNanos, NANOS_FOR_365_DAYS);
 		inputValue = random.nextInt();
 		outputValue = random.nextInt();
 		error = new RuntimeException("test error " + random.nextInt());
@@ -27,17 +31,17 @@ public class BatchElementTest {
 
 
 	@Test
-	public void verifySimpleFields() {
-		final BatchElement<Integer, Integer> element = new BatchElement<>(deadlineNanos, inputValue);
-		assertThat(element.getDeadlineNanos()).isEqualTo(deadlineNanos);
+	void verifySimpleFields() {
+		BatchElement<Integer, Integer> element = new BatchElement<>(lingerDeadlineNanos, completionDeadlineNanos, inputValue);
+		assertThat(element.lingerDeadlineNanos).isEqualTo(lingerDeadlineNanos);
 		assertThat(element.getInputValue()).isEqualTo(inputValue);
 		assertThat(element.outputFuture).isNotDone();
 	}
 
 
 	@Test
-	public void verifySuccess() {
-		final BatchElement<Integer, Integer> element = new BatchElement<>(deadlineNanos, inputValue);
+	void verifySuccess() {
+		BatchElement<Integer, Integer> element = new BatchElement<>(lingerDeadlineNanos, completionDeadlineNanos, inputValue);
 
 		element.success(outputValue);
 		assertThat(element.outputFuture).isCompletedWithValue(outputValue);
@@ -45,30 +49,34 @@ public class BatchElementTest {
 
 
 	@Test
-	public void verifyFailure() {
-		final BatchElement<Integer, Integer> element = new BatchElement<>(deadlineNanos, inputValue);
+	void verifyFailure() {
+		BatchElement<Integer, Integer> element = new BatchElement<>(lingerDeadlineNanos, completionDeadlineNanos, inputValue);
 
 		element.error(error);
-		assertThat(element.outputFuture).hasFailedWithThrowableThat().isInstanceOf(RuntimeException.class).hasMessage(error.getMessage());
+		assertThat(element.outputFuture)
+			.failsWithin(Duration.ZERO)
+			.withThrowableOfType(Exception.class) // We only case about the cause, not the wrapping exception
+			.withCause(error);
 	}
 
 
 	@Test
-	public void verifyEventualSuccess() {
-		final BatchElement<Integer, Integer> element = new BatchElement<>(deadlineNanos, inputValue);
-		element.report(CompletableFuture.completedFuture(outputValue));
+	void verifySuccessForCompletableFutures() {
+		BatchElement<Integer, Integer> element = new BatchElement<>(lingerDeadlineNanos, completionDeadlineNanos, inputValue);
+		CompletableFuture.completedFuture(outputValue).whenComplete(element::report);
 
 		assertThat(element.outputFuture).isCompletedWithValue(outputValue);
 	}
 
 
 	@Test
-	public void verifyEventualFailure() {
-		final BatchElement<Integer, Integer> element = new BatchElement<>(deadlineNanos, inputValue);
-		final CompletableFuture<Integer> future = new CompletableFuture<>();
-		future.completeExceptionally(error);
-		element.report(future);
+	void verifyFailureForCompletableFutures() {
+		BatchElement<Integer, Integer> element = new BatchElement<>(lingerDeadlineNanos, completionDeadlineNanos, inputValue);
+		CompletableFuture.<Integer>failedFuture(error).whenComplete(element::report);
 
-		assertThat(element.outputFuture).hasFailedWithThrowableThat().isInstanceOf(RuntimeException.class).hasMessage(error.getMessage());
+		assertThat(element.outputFuture)
+			.failsWithin(Duration.ZERO)
+			.withThrowableOfType(Exception.class) // We only case about the cause, not the wrapping exception
+			.withCause(error);
 	}
 }

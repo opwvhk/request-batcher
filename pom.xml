@@ -7,7 +7,7 @@
 	<parent>
 		<groupId>net.sf.opk</groupId>
 		<artifactId>opk-parent</artifactId>
-		<version>6</version>
+		<version>7</version>
 	</parent>
 
 	<artifactId>request-batcher</artifactId>
@@ -17,7 +17,7 @@
 	<organization>
 		<!-- Not really an organization, but the owner of the copyrights. -->
 		<name>Oscar Westra van Holthe - Kind</name>
-		<url>http://oscar.westravanholthe.nl/</url>
+		<url>https://github.com/opwvhk</url>
 	</organization>
 	<licenses>
 		<license>
@@ -35,15 +35,10 @@
 
 	<properties>
 		<!-- Build configurations -->
-		<targetJdkVersion>11</targetJdkVersion>
-		<defaultFileEncoding>UTF-8</defaultFileEncoding>
-		<maven.build.timestamp.format>yyyyMMdd.HHmmss</maven.build.timestamp.format>
-
-		<maven.compiler.source>${targetJdkVersion}</maven.compiler.source>
-		<maven.compiler.target>${targetJdkVersion}</maven.compiler.target>
-		<maven.compiler.testSource>${targetJdkVersion}</maven.compiler.testSource>
-		<maven.compiler.testTarget>${targetJdkVersion}</maven.compiler.testTarget>
-		<project.build.sourceEncoding>${defaultFileEncoding}</project.build.sourceEncoding>
+		<maven.compiler.release>17</maven.compiler.release>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<!--<slf4j.version>1.7.36</slf4j.version>-->
+		<slf4j.version>2.0.7</slf4j.version>
 	</properties>
 
 	<dependencies>
@@ -51,34 +46,59 @@
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
-			<version>1.7.21</version>
+			<version>${slf4j.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-simple</artifactId>
-			<version>1.7.21</version>
+			<version>${slf4j.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<!-- Testing -->
 		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
-			<version>4.13.1</version>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-engine</artifactId>
+			<version>5.9.3</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.assertj</groupId>
 			<artifactId>assertj-core</artifactId>
-			<version>3.11.1</version>
+			<version>3.24.2</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-core</artifactId>
-			<version>2.26.0</version>
+			<version>5.3.1</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
+
+	<build>
+		<defaultGoal>verify</defaultGoal>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.11.0</version>
+			</plugin>
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.10</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>prepare-agent</goal>
+							<goal>prepare-agent-integration</goal>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
 
 	<distributionManagement>
 		<snapshotRepository>

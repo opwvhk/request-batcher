@@ -10,21 +10,21 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static java.util.Objects.requireNonNull;
 
-
 /**
- * A capacity limited queue to submit calls to that will be executed in batches. The queue is assumed to be consumed by a {@link BatchRunner} instance running
- * in a separate thread. As this is a multithreaded process, this queue can be shutdown after which no new elements can be added. Shutdown is considered
- * complete when the queue has been shutdown and emptied.
+ * A capacity limited queue to submit calls to that will be executed in batches. Its main use is for a {@link BatchRunner} running in a separate thread. As this
+ * is a multithreaded process, this queue can be shutdown after which no new elements can be added. Shutdown is complete when the queue has been shutdown and
+ * emptied.
  *
  * <p>This queue does not implement {@link BlockingQueue} nor {@link Queue}, because it's not intended to be used as a {@link Collection}, but rather as a
  * bidirectional channel. This is also why {@link #enqueue(Object)} and {@link #enqueue(Object, long, TimeUnit)} return a {@link CompletableFuture}.</p>
  *
  * <h2>Throughput, latency and order</h2>
  *
- * <p>In addition to method specific timeouts, elements on the queue also have a 'timeout': the linger time (specified when constructing the queue). This linger
- * time specifies the amount of time an item on the queue is willing to wait for a batch to fill. When it expires, the item will be picked up in a batch as
- * soon as possible. Larger linger times directly affect latency (it's the minimum latency for the first item in a batch) and increase the probability to
- * batch multiple elements together, thus indirectly increasing throughput.</p>
+ * <p>In addition to method specific timeouts, elements on the queue also have a 'timeout': the linger time (specified when constructing the queue). This
+ * linger
+ * time specifies the amount of time an item on the queue is willing to wait for a batch to fill. When it expires, the item will be picked up in a batch as soon
+ * as possible. Larger linger times directly affect latency (it's the minimum latency for the first item in a batch) and increase the probability to batch
+ * multiple elements together, thus indirectly increasing throughput.</p>
  *
  * <p>The order of items on the queue is determined by the order the elements are added. This order is kept when consuming batches off the queue using a single
  * thread, but not when consuming the queue with multiple threads: if the queue contains elements [A, B, C, D, E], two threads simultaneously acquiring a batch
@@ -69,11 +69,11 @@ public class BatchQueue<Request, Response> {
 	 */
 	private final ReentrantLock lock;
 	/**
-	 * Condition to await free capacity. This condition is signalled on both decrementing {@code count} and setting {@code isShutdown} to {@code true}.
+	 * Condition to await free capacity. Both decrementing {@code count} and setting {@code isShutdown} to {@code true} signals this condition.
 	 */
 	private final Condition elementRemoved;
 	/**
-	 * Condition to await new elements. This condition is signalled on both incrementing {@code count} and setting {@code isShutdown} to {@code true}.
+	 * Condition to await new elements. Both incrementing {@code count} and setting {@code isShutdown} to {@code true} signals this condition.
 	 */
 	private final Condition elementAdded;
 
@@ -82,25 +82,35 @@ public class BatchQueue<Request, Response> {
 	 */
 
 	/**
-	 * The number of nanoseconds an element may linger on the queue to await more elements. Elements will be on the queue at least this long, except when the
-	 * batch they end up in is full sooner.
+	 * The number of nanoseconds an element may linger to await more elements. Elements will be on the queue at least this long, except when the batch they end
+	 * up in is full sooner.
 	 */
 	private final long lingerNs;
-
+	/**
+	 * The timeout (in ns) for enqueued elements to complete. This is the timeout on the queue plus all processing until the final result.
+	 */
+	private final long timeoutNs;
 
 	/**
 	 * Create a batch queue with the given capacity.
 	 *
-	 * @param capacity the maximum number of items on the queue
-	 * @param linger   the time an item may wait on the queue to enlarge the batch
-	 * @param unit     the unit of the parameter {@code timeout}
+	 * @param capacity    the maximum number of items on the queue
+	 * @param linger      the time an item may wait on the queue to enlarge the batch
+	 * @param lingerUnit  the unit of the parameter {@code linger}
+	 * @param timeout     the maximum time until enqueued items must have a result
+	 * @param timeoutUnit the unit of the parameter {@code timeout}
 	 */
-	public BatchQueue(final int capacity, final long linger, final TimeUnit unit) {
+	public BatchQueue(int capacity, long linger, TimeUnit lingerUnit, long timeout, TimeUnit timeoutUnit) {
 		if (capacity <= 0) {
 			throw new IllegalArgumentException("Capacity must be positive");
 		}
-		if (unit.toNanos(linger) < 0 || unit.toNanos(linger) == Long.MAX_VALUE) {
+		lingerNs = lingerUnit.toNanos(linger);
+		if (lingerNs < 0 || lingerNs == Long.MAX_VALUE) {
 			throw new IllegalArgumentException("The linger time must be non-negative and less than 2^63-1 ns (approx. 292 years)");
+		}
+		timeoutNs = timeoutUnit.toNanos(timeout);
+		if (timeoutNs <= lingerNs || timeoutNs == Long.MAX_VALUE) {
+			throw new IllegalArgumentException("The timeout must be larger than the linger time and less than 2^63-1 ns (approx. 292 years)");
 		}
 		items = (BatchElement<Request, Response>[]) new BatchElement[capacity];
 		enqueueIndex = 0;
@@ -110,21 +120,20 @@ public class BatchQueue<Request, Response> {
 		lock = new ReentrantLock();
 		elementRemoved = lock.newCondition();
 		elementAdded = lock.newCondition();
-
-		lingerNs = unit.toNanos(linger);
 	}
 
-
 	/**
-	 * Enqueue an item onto this batch queue. Assumes this thread holds the lock, and that count < items.length (and thus that items[enqueueIndex] == null).
+	 * Enqueue an item onto this batch queue. Callers must acquire the lock, and ensure that the queue is not full.
 	 *
 	 * @param item the item to enqueue
 	 * @return the result future for the enqueued item
 	 */
-	private CompletableFuture<Response> enqueue0(final Request item) {
+	private CompletableFuture<Response> enqueue0(Request item) {
 		// Assumes we hold the lock and count < items.length (and thus that items[enqueueIndex] == null)
 
-		final BatchElement<Request, Response> element = new BatchElement<>(System.nanoTime() + lingerNs, item);
+		// Calculate dealines here:
+		long nanoTime = System.nanoTime();
+		BatchElement<Request, Response> element = new BatchElement<>(nanoTime + lingerNs, timeoutNs, item);
 		items[enqueueIndex] = element;
 
 		enqueueIndex++;
@@ -137,16 +146,15 @@ public class BatchQueue<Request, Response> {
 		return element.outputFuture;
 	}
 
-
 	/**
-	 * Dequeue a batched element from this batch queue. Assumes this thread holds the lock, and that count > 0 (and thus that items[dequeueIndex] != null).
+	 * Dequeue a batched element from this batch queue. Callers must acquire the lock, and ensure that the queue is not empty.
 	 *
 	 * @return the dequeued batched element
 	 */
 	private BatchElement<Request, Response> dequeue0() {
 		// Assumes we hold the lock and count > 0 (and thus that items[dequeueIndex] != null)
 
-		final BatchElement<Request, Response> x = items[dequeueIndex];
+		BatchElement<Request, Response> x = items[dequeueIndex];
 		items[dequeueIndex] = null;
 
 		dequeueIndex++;
@@ -158,16 +166,15 @@ public class BatchQueue<Request, Response> {
 		return x;
 	}
 
-
 	/**
-	 * Enqueue a call to be batched, if it can be done immediately.
+	 * Enqueue a request to execute, if it can be done immediately.
 	 *
-	 * @param request the request to be batched
-	 * @return a future response if the call was batched, or {@code null} if the batch queue was full
+	 * @param request the request to add to the queue
+	 * @return a future response if successful, or {@code null} if the queue was full
 	 */
-	public CompletableFuture<Response> enqueue(final Request request) {
+	public CompletableFuture<Response> enqueue(Request request) {
 		requireNonNull(request);
-		final CompletableFuture<Response> future;
+		CompletableFuture<Response> future;
 
 		lock.lock();
 		try {
@@ -181,20 +188,22 @@ public class BatchQueue<Request, Response> {
 		return future;
 	}
 
-
 	/**
-	 * Enqueue a call to be batched, waiting up to the specified timeout for capacity to become available.
+	 * Enqueue a request to execute, waiting up to the specified timeout if the queue is full.
 	 *
-	 * @param request the request to be batched
-	 * @param timeout the maximum time to wait for queue capacity
+	 * @param request the request to add to the queue
+	 * @param timeout the maximum time to wait for queue capacity; must be non-negative
 	 * @param unit    the unit of the parameter {@code timeout}
-	 * @return a future response if the call was batched, or {@code null} if the batch queue was full
+	 * @return a future response if successful, or {@code null} if the timeout elapsed before there was a place on the batch queue
 	 * @throws InterruptedException if this thread was interrupted while waiting
 	 */
-	public CompletableFuture<Response> enqueue(final Request request, final long timeout, final TimeUnit unit) throws InterruptedException {
+	public CompletableFuture<Response> enqueue(Request request, long timeout, TimeUnit unit) throws InterruptedException {
 		requireNonNull(request);
+		if (timeout < 0) {
+			throw new IllegalArgumentException("timeout must be non-negative");
+		}
 		long nanosToTimeout = unit.toNanos(timeout);
-		final CompletableFuture<Response> future;
+		CompletableFuture<Response> future;
 
 		lock.lockInterruptibly();
 		try {
@@ -214,10 +223,9 @@ public class BatchQueue<Request, Response> {
 		return future;
 	}
 
-
 	/**
-	 * Shuts down the batch queue. After this method has been called, no new elements can be enqueued and
-	 * {@link #acquireBatch(long, TimeUnit, int, Collection)} will return {@code false} eventually (i.e. when the underlying queue is empty).
+	 * Shutdown the batch queue. After this method has been called, no new elements can be added and {@link #acquireBatch(long, TimeUnit, int, Collection)} will
+	 * return {@code false} eventually (i.e., when the underlying queue is empty).
 	 */
 	public void shutdown() {
 		lock.lock();
@@ -231,15 +239,14 @@ public class BatchQueue<Request, Response> {
 		}
 	}
 
-
 	/**
-	 * Check whether the batch queue has been shutdown. If so, calls to {@link #enqueue(Object)} and {@link #enqueue(Object, long, TimeUnit)} will always
-	 * return {@code null}.
+	 * Check whether the batch queue has been shutdown. If so, calls to {@link #enqueue(Object)} and {@link #enqueue(Object, long, TimeUnit)} will always return
+	 * {@code null}.
 	 *
 	 * @return {@code true} if the queue has been shutdown, {@code true} otherwise
 	 */
 	public boolean isShutdown() {
-		final boolean result;
+		boolean result;
 		lock.lock();
 		try {
 			result = this.isShutdown;
@@ -249,7 +256,6 @@ public class BatchQueue<Request, Response> {
 		return result;
 	}
 
-
 	/**
 	 * Check whether the batch queue has been shutdown and emptied. If so, calls to {@link #enqueue(Object)} and {@link #enqueue(Object, long, TimeUnit)} will
 	 * always return {@code null}, and calls to {@link #acquireBatch(long, TimeUnit, int, Collection)} will always return {@code false}.
@@ -257,7 +263,7 @@ public class BatchQueue<Request, Response> {
 	 * @return {@code true} if the queue has been shutdown and emptied, {@code true} otherwise
 	 */
 	public boolean isShutdownComplete() {
-		final boolean result;
+		boolean result;
 		lock.lock();
 		try {
 			result = isShutdown && count == 0;
@@ -267,18 +273,20 @@ public class BatchQueue<Request, Response> {
 		return result;
 	}
 
-
 	/**
 	 * Wait up to the specified timeout for {@link #isShutdownComplete()} to return {@code true}.
 	 *
-	 * @param timeout the maximum time to wait
+	 * @param timeout the maximum time to wait; must be non-negative
 	 * @param unit    the unit of the parameter {@code timeout}
 	 * @return {@code true} if the queue was shutdown and emptied within the timeout, {@code false} if not
 	 * @throws InterruptedException if this thread was interrupted while waiting
 	 */
-	public boolean awaitShutdownComplete(final long timeout, final TimeUnit unit) throws InterruptedException {
+	public boolean awaitShutdownComplete(long timeout, TimeUnit unit) throws InterruptedException {
+		if (timeout < 0) {
+			throw new IllegalArgumentException("timeout must be non-negative");
+		}
 		long nanosToTimeout = unit.toNanos(timeout);
-		final boolean result;
+		boolean result;
 		lock.lock();
 		try {
 			while (!isShutdownComplete()) {
@@ -295,21 +303,20 @@ public class BatchQueue<Request, Response> {
 		return result;
 	}
 
-
 	/**
 	 * Acquire a batch of items from the queue. Waits up to the specified timeout for items to become available, and up to the specified linger time for a
 	 * second item to become available. It returns after that, after having placed at most {@code maxElements} elements in the specified collection.
 	 * <p>
 	 * This means that this method lingers for at most {@code linger} {@code unit}s after it has acquired an item from the queue.
 	 *
-	 * @param timeout     the maximum amount of time to wait for a first item to become available
-	 * @param unit        the unit of the parameters {@code timeout} and {@code linger}
+	 * @param timeout     the maximum amount of time to wait for a first item to become available; must be non-negative
+	 * @param unit        the unit of the {@code timeout} parameter
 	 * @param maxElements the maximum number of elements to put into {@code collection}
 	 * @param collection  the collection to add the elements to
 	 * @return {@code true} until both {@link #shutdown()} has been called and the underlying queue is empty, {@code false} after that
 	 * @throws InterruptedException when the current thread was interrupted while waiting
 	 */
-	public boolean acquireBatch(final long timeout, final TimeUnit unit, final int maxElements, final Collection<BatchElement<Request, Response>> collection)
+	public boolean acquireBatch(long timeout, TimeUnit unit, int maxElements, Collection<BatchElement<Request, Response>> collection)
 		throws InterruptedException {
 		if (timeout < 0) {
 			throw new IllegalArgumentException("timeout must be non-negative");
@@ -319,7 +326,7 @@ public class BatchQueue<Request, Response> {
 		}
 		requireNonNull(collection, "You must supply a collection");
 
-		final boolean canYieldMoreBatches;
+		boolean canYieldMoreBatches;
 
 		lock.lockInterruptibly();
 		try {
@@ -331,10 +338,11 @@ public class BatchQueue<Request, Response> {
 				}
 				if (count > 0) {
 					// Using dequeue0() because it preserves invariants, just in case adding to the collection throws
-					final BatchElement<Request, Response> element = dequeue0();
+					BatchElement<Request, Response> element = dequeue0();
 					if (elementsInBatch == 0) {
-						// This is the first element in the batch, so now our timeout changes to the leftover linger time from the first element
-						nanosToTimeout = element.getDeadlineNanos() - System.nanoTime();
+						// This is the first element in the batch, which will have the first expiring linger time on the queue.
+						// We update our remaining time (if needed) to honor that.
+						nanosToTimeout = Math.min(nanosToTimeout, element.lingerDeadlineNanos - System.nanoTime());
 					}
 
 					elementsInBatch++;

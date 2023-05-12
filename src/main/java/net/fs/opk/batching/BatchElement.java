@@ -1,7 +1,6 @@
 package net.fs.opk.batching;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 
 
@@ -12,25 +11,18 @@ import java.util.concurrent.TimeUnit;
  * @param <R>
  */
 public class BatchElement<T, R> {
-	private final long deadlineNanos;
+	/**
+	 * The value of {@link System#nanoTime()} up to which this element may await more elements to batch.
+	 */
+	final long lingerDeadlineNanos;
 	private final T inputValue;
 	final CompletableFuture<R> outputFuture;
 
 
-	BatchElement(final long deadlineNanos, final T inputValue) {
-		this.deadlineNanos = deadlineNanos;
+	BatchElement(long lingerDeadlineNanos, long completionDeadlineNanos, T inputValue) {
+		this.lingerDeadlineNanos = lingerDeadlineNanos;
 		this.inputValue = inputValue;
-		this.outputFuture = new CompletableFuture<>();
-	}
-
-
-	/**
-	 * The value of {@link System#nanoTime()} up to which this element may await more elements to batch.
-	 *
-	 * @return the linger deadline
-	 */
-	long getDeadlineNanos() {
-		return deadlineNanos;
+		this.outputFuture = new CompletableFuture<R>().orTimeout(completionDeadlineNanos, TimeUnit.NANOSECONDS);
 	}
 
 
@@ -51,7 +43,7 @@ public class BatchElement<T, R> {
 	 *
 	 * @param result the result of the batched request for this element
 	 */
-	public void success(final R result) {
+	public void success(R result) {
 		outputFuture.complete(result);
 	}
 
@@ -63,17 +55,21 @@ public class BatchElement<T, R> {
 	 *
 	 * @param error the error encountered while handling the batched request for this element
 	 */
-	public void error(final Throwable error) {
+	public void error(Throwable error) {
 		outputFuture.completeExceptionally(error);
 	}
 
 
 	/**
-	 * Report the result of the given {@code CompletionStage} as result of this batch element.
+	 * Report a result for this batch element. Reports success unless {@code error != null}.
 	 *
 	 * @param result the (eventual) result for the batch element
 	 */
-	public void report(final CompletionStage<R> result) {
-		result.thenApply(outputFuture::complete).exceptionally(outputFuture::completeExceptionally);
+	public void report(R result, Throwable error) {
+		if (error == null) {
+			outputFuture.complete(result);
+		} else {
+			outputFuture.completeExceptionally(error);
+		}
 	}
 }
