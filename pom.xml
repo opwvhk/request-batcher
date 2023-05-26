@@ -7,13 +7,12 @@
 	<parent>
 		<groupId>net.sf.opk</groupId>
 		<artifactId>opk-parent</artifactId>
-		<version>7</version>
+		<version>8</version>
 	</parent>
 
 	<artifactId>request-batcher</artifactId>
 	<version>0.2-SNAPSHOT</version>
 
-	<inceptionYear>2019</inceptionYear>
 	<organization>
 		<!-- Not really an organization, but the owner of the copyrights. -->
 		<name>Oscar Westra van Holthe - Kind</name>
@@ -26,6 +25,14 @@
 			<distribution>repo</distribution>
 		</license>
 	</licenses>
+	<inceptionYear>2019</inceptionYear>
+
+	<developers>
+		<developer>
+			<name>Oscar Westra van Holthe - Kind</name>
+		</developer>
+	</developers>
+
 
 	<scm>
 		<url>https://github.com/opwvhk/request-batcher</url>
@@ -37,7 +44,6 @@
 		<!-- Build configurations -->
 		<maven.compiler.release>17</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<!--<slf4j.version>1.7.36</slf4j.version>-->
 		<slf4j.version>2.0.7</slf4j.version>
 	</properties>
 
@@ -85,11 +91,6 @@
 		<defaultGoal>verify</defaultGoal>
 		<plugins>
 			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.11.0</version>
-			</plugin>
-			<plugin>
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>0.8.10</version>
@@ -105,16 +106,4 @@
 			</plugin>
 		</plugins>
 	</build>
-
-	<distributionManagement>
-		<snapshotRepository>
-			<id>ossrh</id>
-			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
-		</snapshotRepository>
-		<repository>
-			<id>ossrh</id>
-			<url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-		</repository>
-		<site/>
-	</distributionManagement>
 </project>
