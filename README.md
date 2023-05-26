@@ -1,4 +1,7 @@
-# Request Batcher
+Request Batcher
+===============
+
+Library to collect requests into batches to reduce request overhead.
 
 When dealing with a remote requests, request overhead can be significant. Especially for high
 request volumes.
@@ -7,7 +10,39 @@ But for high volumes, it is often possible (desirable even) to trade a bit of ex
 (much) higher throughput. This can be done by batching multiple requests together. This library
 takes care of the lowlevel stuff around that. All you have to do is handle the batched requests.
 
-## Usage example
+
+Timing
+------
+
+Collecting multiple requests (to other servers) into batches means that multiple threads and
+multiple servers are involved. This means we'll need to consider timeouts.
+
+The following timeouts are available:
+
+1. When enqueuing requests, you can specify the maximum time to block before failing.
+2. A queue has a linger time: how long requests can wait on the queue to collect a larger batch
+3. A queued request has a timeout: how long it may take to complete
+
+
+Logging and Metrics
+-------------------
+
+This library uses [SLF4J](https://www.slf4j.org/) for logging and
+[micrometer](https://micrometer.io/) for metrics.
+
+Logs are written only using the name `net.fs.opk.batching.BatchRunner`, describing changes in run
+state.
+
+The following metrics are exposed:
+
+| Metric                    | Type  | Description                                          |
++---------------------------+-------+------------------------------------------------------+
+| `<queue name>.queued`     | Timer | The time spent on the queue                          |
+| `<queue name>.processing` | Timer | The time it took to process an item since enqueueing |
+
+
+Usage example
+-------------
 
 In this (contrived) example we'll batch numbered requests, returning a description. In real
 scenario's you'd perform a network call.
@@ -29,7 +64,8 @@ public class Example {
 
 		// Step 1 (configuration): create a BatchQueue, and start at least one BatchRunner to consume it
 
-		BatchQueue<Integer, String> batchQueue = new BatchQueue<>(10_000, 1, MILLISECONDS, 30, SECONDS);
+		BatchQueue<Integer, String> batchQueue = new BatchQueue<>(10_000,
+			1, MILLISECONDS, 30, SECONDS);
 
 		ExecutorService executor = Executors.newFixedThreadPool(1);
 		executor.execute(BatchRunnerFactory.forConsumer(batchQueue, 5, batch -> {

@@ -54,6 +54,12 @@
 			<version>${slf4j.version}</version>
 			<scope>test</scope>
 		</dependency>
+		<!-- Observability -->
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-core</artifactId>
+			<version>1.11.0</version>
+		</dependency>
 		<!-- Testing -->
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>

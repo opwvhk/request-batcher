@@ -2,11 +2,19 @@ package net.fs.opk.batching;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import io.micrometer.core.instrument.Meter;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.assertj.core.api.Condition;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -52,6 +60,8 @@ class BatchQueueTest {
 		assertThat(queue.acquireBatch(0, MILLISECONDS, 2, batch)).isTrue();
 		assertThat(batch).extracting(BatchElement::getInputValue).containsExactly("three", "four");
 		assertThat(queue).has(validInvariants).matches(q -> q.count == 0, "size");
+
+		queue.shutdown();
 	}
 
 	@Test
@@ -63,6 +73,8 @@ class BatchQueueTest {
 		assertThat(queue.enqueue("three", 2, MILLISECONDS)).isNotNull();
 		assertThat(queue.enqueue("four", 2, MILLISECONDS)).isNull();
 		assertThat(queue.enqueue("four")).isNull();
+
+		queue.shutdown();
 	}
 
 	@Test
@@ -114,6 +126,8 @@ class BatchQueueTest {
 		assertThatThrownBy(() -> queue.enqueue(null, 1, NANOSECONDS)).isInstanceOf(NullPointerException.class);
 		assertThatThrownBy(() -> queue.enqueue("Foo", -1, NANOSECONDS)).isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> queue.enqueue("foo", 1, null)).isInstanceOf(NullPointerException.class);
+
+		queue.shutdown();
 	}
 
 	@Test
@@ -125,6 +139,8 @@ class BatchQueueTest {
 		assertThatThrownBy(() -> queue.acquireBatch(1, null, 1, list)).isInstanceOf(NullPointerException.class);
 		assertThatThrownBy(() -> queue.acquireBatch(10, NANOSECONDS, 0, list)).isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> queue.acquireBatch(10, NANOSECONDS, 1, null)).isInstanceOf(NullPointerException.class);
+
+		queue.shutdown();
 	}
 
 	@Test
@@ -132,6 +148,8 @@ class BatchQueueTest {
 		BatchQueue<String, String> queue = new BatchQueue<>(3, 10, NANOSECONDS, 10, MILLISECONDS);
 
 		assertThatThrownBy(() -> queue.awaitShutdownComplete(-1, NANOSECONDS)).isInstanceOf(IllegalArgumentException.class);
+
+		queue.shutdown();
 	}
 
 	@Test
@@ -158,6 +176,8 @@ class BatchQueueTest {
 		List<BatchElement<String, String>> batch = new ArrayList<>();
 		assertThat(queue.acquireBatch(10, NANOSECONDS, 1, batch)).isTrue();
 		assertThat(batch).extracting(BatchElement::getInputValue).containsExactly("one");
+
+		queue.shutdown();
 	}
 
 	@Test
@@ -165,10 +185,56 @@ class BatchQueueTest {
 	void verifyAwaitingNewElements_One() throws InterruptedException {
 		BatchQueue<String, String> queue = new BatchQueue<>(2, 10, MILLISECONDS, 30, TimeUnit.SECONDS);
 		queue.enqueue("one");
+		queue.enqueue("two").cancel(false);
 		queue.shutdown();
 
 		List<BatchElement<String, String>> batch = new ArrayList<>();
-		assertThat(queue.acquireBatch(10, NANOSECONDS, 2, batch)).isFalse();
+		assertThat(queue.acquireBatch(10, NANOSECONDS, 10, batch)).isFalse();
 		assertThat(batch).extracting(BatchElement::getInputValue).containsExactly("one");
+	}
+
+	@Test
+	@Timeout(value = 300, unit = MILLISECONDS)
+	void verifyMetrics() throws InterruptedException {
+		SimpleMeterRegistry registry = new SimpleMeterRegistry();
+		try {
+			Metrics.globalRegistry.add(registry);
+
+			BatchQueue<String, String> queue = new BatchQueue<>(2, 10, MILLISECONDS, 30, TimeUnit.SECONDS);
+			CompletableFuture<String> future = queue.enqueue("one");
+			List<BatchElement<String, String>> batch = new ArrayList<>();
+			assertThat(queue.acquireBatch(10, NANOSECONDS, 10, batch)).isTrue();
+			Thread.sleep(50);
+			future.complete("done");
+
+			List<Meter> meters = Metrics.globalRegistry.getMeters();
+			queue.shutdown();
+
+			assertThat(meters).map(Meter::getId).map(Meter.Id::getName).map(s -> s.replaceAll("batch_queue_\\d","batch_queue"))
+				.containsExactlyInAnyOrder("batch_queue.queued", "batch_queue.processing");
+			assertThat(meters).map(Meter::getId).map(Meter.Id::getType).containsExactly(Meter.Type.TIMER, Meter.Type.TIMER);
+
+			Function<Meter, String> classifier = m -> m.getId().getName().replaceAll("batch_queue_\\d\\.", "");
+			Map<String, Meter> meterMap = meters.stream().collect(Collectors.toMap(classifier, m -> m));
+
+			Timer queuedTimer = (Timer) meterMap.get("queued");
+			assertThat(queuedTimer.count()).isEqualTo(1);
+			double queuedTime = queuedTimer.totalTime(MILLISECONDS);
+
+			Timer processingTimer = (Timer) meterMap.get("processing");
+			assertThat(processingTimer.count()).isEqualTo(1);
+			double processingTime = processingTimer.totalTime(MILLISECONDS);
+
+			assertThat(queuedTime).isLessThan(10); // less than linger time: this 1st item was already there when acquiring the batch
+			assertThat(processingTime - queuedTime).isGreaterThan(60); // 10ms linger + 50ms sleep
+		} finally {
+			Metrics.globalRegistry.remove(registry);
+		}
+	}
+
+	private static <T> List<T> list(Iterable<T> iterable) {
+		ArrayList<T> result = new ArrayList<>();
+		iterable.forEach(result::add);
+		return result;
 	}
 }

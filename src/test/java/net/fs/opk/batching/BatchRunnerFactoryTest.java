@@ -44,11 +44,11 @@ class BatchRunnerFactoryTest {
 
 	@BeforeEach
 	void setUp() throws InterruptedException {
-		e1 = new BatchElement<>(42L, 42_000_000_000L, "one");
-		e2 = new BatchElement<>(42L, 42_000_000_000L, "two");
-		e3 = new BatchElement<>(42L, 42_000_000_000L, "three");
-		e4 = new BatchElement<>(42L, 42_000_000_000L, "four");
-		e5 = new BatchElement<>(42L, 42_000_000_000L, "five");
+		e1 = new BatchElement<>("one", 42L, 42_000_000_000L);
+		e2 = new BatchElement<>("two", 42L, 42_000_000_000L);
+		e3 = new BatchElement<>("three", 42L, 42_000_000_000L);
+		e4 = new BatchElement<>("four", 42L, 42_000_000_000L);
+		e5 = new BatchElement<>("five", 42L, 42_000_000_000L);
 		AtomicInteger counter = new AtomicInteger(2);
 
 		queue = (BatchQueue<String, String>) mock(BatchQueue.class);

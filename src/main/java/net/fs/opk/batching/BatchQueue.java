@@ -8,6 +8,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
+import net.fs.opk.util.Namer;
+
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -21,16 +25,16 @@ import static java.util.Objects.requireNonNull;
  * <h2>Throughput, latency and order</h2>
  *
  * <p>In addition to method specific timeouts, elements on the queue also have a 'timeout': the linger time (specified when constructing the queue). This
- * linger
- * time specifies the amount of time an item on the queue is willing to wait for a batch to fill. When it expires, the item will be picked up in a batch as soon
- * as possible. Larger linger times directly affect latency (it's the minimum latency for the first item in a batch) and increase the probability to batch
- * multiple elements together, thus indirectly increasing throughput.</p>
+ * linger time specifies the amount of time an item on the queue is willing to wait for a batch to fill. When it expires, the item will be picked up in a batch
+ * as soon as possible. Larger linger times directly affect latency (it's the minimum latency for the first item in a batch) and increase the probability to
+ * batch multiple elements together, thus indirectly increasing throughput.</p>
  *
  * <p>The order of items on the queue is determined by the order the elements are added. This order is kept when consuming batches off the queue using a single
  * thread, but not when consuming the queue with multiple threads: if the queue contains elements [A, B, C, D, E], two threads simultaneously acquiring a batch
  * may receive the batches [A, C, D] and [B, E] respectively.</p>
  */
 public class BatchQueue<Request, Response> {
+	private static final Namer metricNamer = new Namer("batch_queue_");
 	/**
 	 * The queued items.
 	 * <p>
@@ -90,6 +94,8 @@ public class BatchQueue<Request, Response> {
 	 * The timeout (in ns) for enqueued elements to complete. This is the timeout on the queue plus all processing until the final result.
 	 */
 	private final long timeoutNs;
+	private final Timer queueTimer;
+	private final Timer processingTimer;
 
 	/**
 	 * Create a batch queue with the given capacity.
@@ -101,6 +107,19 @@ public class BatchQueue<Request, Response> {
 	 * @param timeoutUnit the unit of the parameter {@code timeout}
 	 */
 	public BatchQueue(int capacity, long linger, TimeUnit lingerUnit, long timeout, TimeUnit timeoutUnit) {
+		this(capacity, linger, lingerUnit, timeout, timeoutUnit, null);
+	}
+
+	/**
+	 * Create a batch queue with the given capacity.
+	 *
+	 * @param capacity    the maximum number of items on the queue
+	 * @param linger      the time an item may wait on the queue to enlarge the batch
+	 * @param lingerUnit  the unit of the parameter {@code linger}
+	 * @param timeout     the maximum time until enqueued items must have a result
+	 * @param timeoutUnit the unit of the parameter {@code timeout}
+	 */
+	public BatchQueue(int capacity, long linger, TimeUnit lingerUnit, long timeout, TimeUnit timeoutUnit, String queueName, String... queueTags) {
 		if (capacity <= 0) {
 			throw new IllegalArgumentException("Capacity must be positive");
 		}
@@ -112,6 +131,11 @@ public class BatchQueue<Request, Response> {
 		if (timeoutNs <= lingerNs || timeoutNs == Long.MAX_VALUE) {
 			throw new IllegalArgumentException("The timeout must be larger than the linger time and less than 2^63-1 ns (approx. 292 years)");
 		}
+
+		String metricName = metricNamer.name(queueName);
+		queueTimer = Metrics.timer(metricName + ".queued", queueTags);
+		processingTimer = Metrics.timer(metricName + ".processing", queueTags);
+
 		items = (BatchElement<Request, Response>[]) new BatchElement[capacity];
 		enqueueIndex = 0;
 		dequeueIndex = 0;
@@ -131,9 +155,10 @@ public class BatchQueue<Request, Response> {
 	private CompletableFuture<Response> enqueue0(Request item) {
 		// Assumes we hold the lock and count < items.length (and thus that items[enqueueIndex] == null)
 
-		// Calculate dealines here:
+		// Calculate deadlines here:
 		long nanoTime = System.nanoTime();
-		BatchElement<Request, Response> element = new BatchElement<>(nanoTime + lingerNs, timeoutNs, item);
+		BatchElement<Request, Response> element = new BatchElement<>(item, nanoTime + lingerNs, timeoutNs);
+		element.outputFuture.whenComplete((ignored1, ignored2) -> processingTimer.record(System.nanoTime() - nanoTime, TimeUnit.NANOSECONDS));
 		items[enqueueIndex] = element;
 
 		enqueueIndex++;
@@ -231,6 +256,8 @@ public class BatchQueue<Request, Response> {
 		lock.lock();
 		try {
 			isShutdown = true;
+			Metrics.globalRegistry.remove(queueTimer);
+			Metrics.globalRegistry.remove(processingTimer);
 			// Signal all waiting threads: as the queue can only be emptied now, there's no need to wait for capacity nor wait for new elements.
 			elementRemoved.signal();
 			elementAdded.signal();
@@ -337,12 +364,18 @@ public class BatchQueue<Request, Response> {
 					nanosToTimeout = elementAdded.awaitNanos(nanosToTimeout);
 				}
 				if (count > 0) {
-					// Using dequeue0() because it preserves invariants, just in case adding to the collection throws
+					// Using dequeue0() because it preserves invariants
 					BatchElement<Request, Response> element = dequeue0();
+					if (element.outputFuture.isDone()) {
+						continue; // Already done (probably cancelled); adding it to the batch makes no sense anymore
+					}
+					long lingerTimeLeft = element.lingerDeadlineNanos - System.nanoTime(); // Can become negative (by design)
+					long nanosInQueue = lingerNs - lingerTimeLeft;
+					queueTimer.record(nanosInQueue, TimeUnit.NANOSECONDS);
 					if (elementsInBatch == 0) {
 						// This is the first element in the batch, which will have the first expiring linger time on the queue.
 						// We update our remaining time (if needed) to honor that.
-						nanosToTimeout = Math.min(nanosToTimeout, element.lingerDeadlineNanos - System.nanoTime());
+						nanosToTimeout = Math.max(nanosToTimeout, lingerTimeLeft);
 					}
 
 					elementsInBatch++;
