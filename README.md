@@ -36,7 +36,7 @@ state.
 The following metrics are exposed:
 
 | Metric                    | Type  | Description                                          |
-+---------------------------+-------+------------------------------------------------------+
+|---------------------------|-------|------------------------------------------------------|
 | `<queue name>.queued`     | Timer | The time spent on the queue                          |
 | `<queue name>.processing` | Timer | The time it took to process an item since enqueueing |
 
