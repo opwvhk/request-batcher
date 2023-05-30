@@ -49,7 +49,6 @@ jobs:
         uses: PavanMudigonda/jacoco-reporter@v4.9
         with:
           coverage_results_path: 'target/site/jacoco/jacoco.xml'
-          coverage_report_title: 'Test Coverage Results'
           coverage_report_name: 'Test Coverage Results'
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
