@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -212,11 +211,11 @@ class BatchQueueTest {
 
 			assertThat(meters).map(Meter::getId).map(Meter.Id::getName).filteredOn(s -> s.startsWith("metrics_test"))
 				.containsExactlyInAnyOrder("metrics_test.queued", "metrics_test.processing");
-			assertThat(meters).map(Meter::getId).map(Meter.Id::getType).containsExactly(Meter.Type.TIMER, Meter.Type.TIMER);
+			assertThat(meters).map(Meter::getId).filteredOn(id -> id.getName().startsWith("metrics_test")).map(Meter.Id::getType)
+				.containsExactly(Meter.Type.TIMER, Meter.Type.TIMER);
 
-			Function<Meter, String> classifier = m -> m.getId().getName().replaceAll("batch_queue_\\d\\.", "");
 			Map<String, Meter> meterMap = meters.stream().filter(m -> m.getId().getName().startsWith("metrics_test"))
-				.collect(Collectors.toMap(classifier, m -> m));
+				.collect(Collectors.toMap(m -> m.getId().getName(), m -> m));
 
 			Timer queuedTimer = (Timer) meterMap.get("metrics_test.queued");
 			assertThat(queuedTimer.count()).isEqualTo(1);
