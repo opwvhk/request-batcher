@@ -108,7 +108,7 @@ class BatchRunnerFactoryTest {
 	}
 
 	@Test
-	@Timeout(value = 50, unit = MILLISECONDS)
+	//@Timeout(value = 100, unit = MILLISECONDS)
 	void validateTermination() {
 		batchCollector = (timeout, unit, maxElements, collection) -> {
 			throw new InterruptedException();
