@@ -200,7 +200,7 @@ class BatchQueueTest {
 		try {
 			Metrics.globalRegistry.add(registry);
 
-			BatchQueue<String, String> queue = new BatchQueue<>(2, 10, MILLISECONDS, 30, TimeUnit.SECONDS);
+			BatchQueue<String, String> queue = new BatchQueue<>(2, 10, MILLISECONDS, 30, TimeUnit.SECONDS, "metrics_test");
 			CompletableFuture<String> future = queue.enqueue("one");
 			List<BatchElement<String, String>> batch = new ArrayList<>();
 			assertThat(queue.acquireBatch(10, NANOSECONDS, 10, batch)).isTrue();
@@ -210,18 +210,19 @@ class BatchQueueTest {
 			List<Meter> meters = Metrics.globalRegistry.getMeters();
 			queue.shutdown();
 
-			assertThat(meters).map(Meter::getId).map(Meter.Id::getName).map(s -> s.replaceAll("batch_queue_\\d","batch_queue"))
-				.containsExactlyInAnyOrder("batch_queue.queued", "batch_queue.processing");
+			assertThat(meters).map(Meter::getId).map(Meter.Id::getName).filteredOn(s -> s.startsWith("metrics_test"))
+				.containsExactlyInAnyOrder("metrics_test.queued", "metrics_test.processing");
 			assertThat(meters).map(Meter::getId).map(Meter.Id::getType).containsExactly(Meter.Type.TIMER, Meter.Type.TIMER);
 
 			Function<Meter, String> classifier = m -> m.getId().getName().replaceAll("batch_queue_\\d\\.", "");
-			Map<String, Meter> meterMap = meters.stream().collect(Collectors.toMap(classifier, m -> m));
+			Map<String, Meter> meterMap = meters.stream().filter(m -> m.getId().getName().startsWith("metrics_test"))
+				.collect(Collectors.toMap(classifier, m -> m));
 
-			Timer queuedTimer = (Timer) meterMap.get("queued");
+			Timer queuedTimer = (Timer) meterMap.get("metrics_test.queued");
 			assertThat(queuedTimer.count()).isEqualTo(1);
 			double queuedTime = queuedTimer.totalTime(MILLISECONDS);
 
-			Timer processingTimer = (Timer) meterMap.get("processing");
+			Timer processingTimer = (Timer) meterMap.get("metrics_test.processing");
 			assertThat(processingTimer.count()).isEqualTo(1);
 			double processingTime = processingTimer.totalTime(MILLISECONDS);
 
@@ -230,11 +231,5 @@ class BatchQueueTest {
 		} finally {
 			Metrics.globalRegistry.remove(registry);
 		}
-	}
-
-	private static <T> List<T> list(Iterable<T> iterable) {
-		ArrayList<T> result = new ArrayList<>();
-		iterable.forEach(result::add);
-		return result;
 	}
 }
