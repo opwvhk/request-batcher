@@ -59,7 +59,7 @@ class BatchRunnerFactoryTest {
 			}
 		};
 
-		BatchQueue<String, String> queue = new BatchQueue<>(0, 0, MILLISECONDS, 0, MILLISECONDS) {
+		BatchQueue<String, String> queue = new BatchQueue<>(1, 0, MILLISECONDS, 1, MILLISECONDS) {
 			@Override
 			public boolean acquireBatch(long timeout, TimeUnit unit, int maxElements, Collection<BatchElement<String, String>> collection)
 				throws InterruptedException {
