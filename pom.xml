@@ -112,7 +112,7 @@
 					<execution>
 						<goals>
 							<goal>prepare-agent</goal>
-							<goal>prepare-agent-integration</goal>
+							<!--<goal>prepare-agent-integration</goal>-->
 							<goal>report</goal>
 						</goals>
 					</execution>

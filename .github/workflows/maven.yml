@@ -50,6 +50,7 @@ jobs:
         with:
           coverage_results_path: 'target/site/jacoco/jacoco.xml'
           coverage_report_name: 'Test Coverage Results'
+          coverage_report_title: 'Test Coverage Results'
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
 # Option: use GitHub secrets to add deployment to Maven Central. See:
