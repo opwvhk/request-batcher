@@ -20,77 +20,66 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyCollection;
-import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.anyList;
-import static org.mockito.Mockito.anyLong;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 class BatchRunnerFactoryTest {
 	private static final int BATCH_SIZE = 3;
 
-	private BatchQueue<String, String> queue;
+	private AtomicInteger batchCounter;
 	private BatchElement<String, String> e1, e2, e3, e4, e5;
-	private Consumer<List<BatchElement<String, String>>> batchHandler;
 
+	private BatchCollector batchCollector;
+	private Consumer<List<BatchElement<String, String>>> batchHandler;
 	private BatchRunner<String, String> runner;
 
 	@BeforeEach
-	void setUp() throws InterruptedException {
+	void setUp() {
 		e1 = new BatchElement<>("one", 42L, 42_000_000_000L);
 		e2 = new BatchElement<>("two", 42L, 42_000_000_000L);
 		e3 = new BatchElement<>("three", 42L, 42_000_000_000L);
 		e4 = new BatchElement<>("four", 42L, 42_000_000_000L);
 		e5 = new BatchElement<>("five", 42L, 42_000_000_000L);
-		AtomicInteger counter = new AtomicInteger(2);
 
-		queue = (BatchQueue<String, String>) mock(BatchQueue.class);
-		when(queue.acquireBatch(anyLong(), any(TimeUnit.class), anyInt(), anyCollection())).thenAnswer(invocation -> {
-			assertThat((TimeUnit) invocation.getArgument(1)).isEqualTo(SECONDS);
-			assertThat((Integer) invocation.getArgument(2)).isEqualTo(BATCH_SIZE);
-			Collection<BatchElement<String, String>> batch = (Collection<BatchElement<String, String>>) invocation.getArgument(3, Collection.class);
-			switch (counter.getAndDecrement()) {
-				case 2 -> {
-					batch.addAll(asList(e1, e2, e3));
+		batchCounter = new AtomicInteger(0);
+		batchHandler = batch -> {};
+		batchCollector = (timeout, unit, maxElements, collection) -> {
+			assertThat(unit).isEqualTo(SECONDS);
+			assertThat(maxElements).isEqualTo(BATCH_SIZE);
+			switch (batchCounter.getAndIncrement()) {
+				case 0 -> {
+					collection.addAll(asList(e1, e2, e3));
 					return true;
 				}
 				case 1 -> {
 					return true;
 				}
 				default -> {
-					batch.addAll(asList(e4, e5));
+					collection.addAll(asList(e4, e5));
 					return false;
 				}
 			}
-		});
+		};
 
-		batchHandler = (Consumer<List<BatchElement<String, String>>>) mock(Consumer.class);
-
-		runner = BatchRunnerFactory.forConsumer(queue, BATCH_SIZE, batchHandler);
+		BatchQueue<String, String> queue = new BatchQueue<>(0, 0, MILLISECONDS, 0, MILLISECONDS) {
+			@Override
+			public boolean acquireBatch(long timeout, TimeUnit unit, int maxElements, Collection<BatchElement<String, String>> collection)
+				throws InterruptedException {
+				return batchCollector.acquireBatch(timeout, unit, maxElements, collection);
+			}
+		};
+		runner = BatchRunnerFactory.forConsumer(queue, BATCH_SIZE, batch -> batchHandler.accept(batch));
 	}
 
 	@Test
 	@Timeout(value = 50, unit = MILLISECONDS)
-	void validateHappyFlow() throws InterruptedException {
-		doAnswer(invocation -> {
-			List<BatchElement<String, String>> batch = (List<BatchElement<String, String>>) invocation.getArgument(0, List.class);
-			batch.forEach(element -> {
-				element.success("[" + element.getInputValue() + "]");
-				System.out.printf("%s -> %s\n", element.getInputValue(), element.outputFuture.getNow("-"));
-			});
-			return null;
-		}).when(batchHandler).accept(anyList());
+	void validateHappyFlow() {
+		batchHandler = batch -> batch.forEach(element -> {
+			element.success("[" + element.getInputValue() + "]");
+			System.out.printf("%s -> %s\n", element.getInputValue(), element.outputFuture.getNow("-"));
+		});
 
 		runner.run();
 
-		verify(queue, times(3)).acquireBatch(anyLong(), eq(SECONDS), anyInt(), anyCollection());
+		assertThat(batchCounter).hasValue(3);
 
 		assertThat(e1.outputFuture).isCompletedWithValue("[one]");
 		assertThat(e2.outputFuture).isCompletedWithValue("[two]");
@@ -101,13 +90,15 @@ class BatchRunnerFactoryTest {
 
 	@Test
 	@Timeout(value = 300, unit = MILLISECONDS)
-	void validateBatchStartCrashing() throws InterruptedException {
+	void validateBatchStartCrashing() {
 		RuntimeException error = new RuntimeException("test error");
-		doThrow(error).when(batchHandler).accept(anyList());
+		batchHandler = _ignored -> {
+			throw error;
+		};
 
 		runner.run();
 
-		verify(queue, times(3)).acquireBatch(anyLong(), eq(SECONDS), anyInt(), anyCollection());
+		assertThat(batchCounter).hasValue(3);
 
 		assertThat(e1.outputFuture).failsWithin(Duration.ZERO).withThrowableOfType(Exception.class).withCause(error);
 		assertThat(e2.outputFuture).failsWithin(Duration.ZERO).withThrowableOfType(Exception.class).withCause(error);
@@ -118,8 +109,10 @@ class BatchRunnerFactoryTest {
 
 	@Test
 	@Timeout(value = 50, unit = MILLISECONDS)
-	void validateTermination() throws InterruptedException {
-		when(queue.acquireBatch(anyLong(), any(TimeUnit.class), anyInt(), anyCollection())).thenThrow(new InterruptedException());
+	void validateTermination() {
+		batchCollector = (timeout, unit, maxElements, collection) -> {
+			throw new InterruptedException();
+		};
 
 		runner.run();
 
@@ -132,9 +125,11 @@ class BatchRunnerFactoryTest {
 
 	@Test
 	@Timeout(value = 50, unit = MILLISECONDS)
-	void validateAbnormalTermination() throws InterruptedException {
+	void validateAbnormalTermination() {
 		RuntimeException exception = new RuntimeException();
-		when(queue.acquireBatch(anyLong(), any(TimeUnit.class), anyInt(), anyCollection())).thenThrow(exception);
+		batchCollector = (timeout, unit, maxElements, collection) -> {
+			throw exception;
+		};
 
 		runner.run();
 
@@ -233,5 +228,9 @@ class BatchRunnerFactoryTest {
 		assertThat(e3.outputFuture).failsWithin(Duration.ZERO).withThrowableOfType(Exception.class).withCause(exception);
 		assertThat(e4.outputFuture).failsWithin(Duration.ZERO).withThrowableOfType(Exception.class).withCause(exception);
 		assertThat(e5.outputFuture).failsWithin(Duration.ZERO).withThrowableOfType(Exception.class).withCause(exception);
+	}
+
+	private interface BatchCollector {
+		boolean acquireBatch(long timeout, TimeUnit unit, int maxElements, Collection<BatchElement<String, String>> collection) throws InterruptedException;
 	}
 }
