@@ -32,7 +32,7 @@ public class Namer {
 	 * Create a namer using the specified default name, and a function to correct names (e.g., by removing whitespace, fixing capitalisation, etc.).
 	 *
 	 * @param defaultName   the default name to use
-	 * @param nameCorrector a fnction that corrects names before returning them
+	 * @param nameCorrector a function that corrects names before returning them
 	 */
 	public Namer(String defaultName, Function<String, String> nameCorrector) {
 		this.defaultName = nameCorrector.apply(requireNonNull(defaultName));
