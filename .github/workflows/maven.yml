@@ -6,6 +6,10 @@ name: Java CI with Maven
 on:
   push:
     branches: [ main ]
+    paths:
+      - .github/**.yml
+      - src/**
+      - pom.xml
   pull_request:
     branches: [ main ]
 
