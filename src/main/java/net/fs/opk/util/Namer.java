@@ -8,7 +8,8 @@ import java.util.function.Function;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Simple utility to name stuff. Ensures names exist by either taking a given name, or by creating one. Created names ae numbered to ensure uniqueness.
+ * Simple utility to name stuff. Ensures names exist by either taking a given name, or by creating one. Created names
+ * are numbered to ensure uniqueness.
  */
 public class Namer {
 	private final String defaultName;
@@ -25,11 +26,14 @@ public class Namer {
 	}
 
 	private static String sanitize(String prefix) {
-		return Normalizer.normalize(prefix.strip(), Normalizer.Form.NFKD).replaceAll("\\p{M}", "").replaceAll("[\\W_]+", "_").toLowerCase(Locale.ROOT);
+		// Remove all accents, collapse non-word characters and underscores into single underscores and convert to lowercase.
+		return Normalizer.normalize(prefix.strip(), Normalizer.Form.NFKD).replaceAll("\\p{M}", "")
+			.replaceAll("[\\W_]+", "_").toLowerCase(Locale.ROOT);
 	}
 
 	/**
-	 * Create a namer using the specified default name, and a function to correct names (e.g., by removing whitespace, fixing capitalisation, etc.).
+	 * Create a namer using the specified default name, and a function to correct names (e.g., by removing whitespace,
+	 * fixing capitalization, etc.).
 	 *
 	 * @param defaultName   the default name to use
 	 * @param nameCorrector a function that corrects names before returning them

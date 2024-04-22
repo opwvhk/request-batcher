@@ -103,6 +103,24 @@ class BatchQueueTest {
 	}
 
 	@Test
+	void verifyInterruptingAwaitShutdownComplete() {
+		BatchQueue<String, String> queue = new BatchQueue<>(3, 10, NANOSECONDS, 10, MILLISECONDS);
+		Thread.currentThread().interrupt();
+		assertThatThrownBy(() -> queue.awaitShutdownComplete(10, NANOSECONDS)).isInstanceOf(InterruptedException.class);
+
+		queue.shutdown();
+	}
+
+	@Test
+	void verifyArgumentChecksToAwaitShutdownComplete() {
+		BatchQueue<String, String> queue = new BatchQueue<>(3, 10, NANOSECONDS, 10, MILLISECONDS);
+
+		assertThatThrownBy(() -> queue.awaitShutdownComplete(-1, NANOSECONDS)).isInstanceOf(IllegalArgumentException.class);
+
+		queue.shutdown();
+	}
+
+	@Test
 	void verifyConstructionArgumentChecks() {
 		// Capacity
 		assertThatThrownBy(() -> new BatchQueue<>(0, 10, NANOSECONDS, 10, MILLISECONDS)).isInstanceOf(IllegalArgumentException.class);
@@ -138,15 +156,6 @@ class BatchQueueTest {
 		assertThatThrownBy(() -> queue.acquireBatch(1, null, 1, list)).isInstanceOf(NullPointerException.class);
 		assertThatThrownBy(() -> queue.acquireBatch(10, NANOSECONDS, 0, list)).isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> queue.acquireBatch(10, NANOSECONDS, 1, null)).isInstanceOf(NullPointerException.class);
-
-		queue.shutdown();
-	}
-
-	@Test
-	void verifyArgumentChecksToAwaitShutdownComplete() {
-		BatchQueue<String, String> queue = new BatchQueue<>(3, 10, NANOSECONDS, 10, MILLISECONDS);
-
-		assertThatThrownBy(() -> queue.awaitShutdownComplete(-1, NANOSECONDS)).isInstanceOf(IllegalArgumentException.class);
 
 		queue.shutdown();
 	}

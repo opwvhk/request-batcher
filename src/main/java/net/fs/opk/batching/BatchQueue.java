@@ -153,7 +153,7 @@ public class BatchQueue<Request, Response> {
 	 * @return the result future for the enqueued item
 	 */
 	private CompletableFuture<Response> enqueue0(Request item) {
-		// Assumes we hold the lock and count < items.length (and thus that items[enqueueIndex] == null)
+		// Assumes we hold the lock and count < items.length (and thus items[enqueueIndex] == null)
 
 		// Calculate deadlines here:
 		long nanoTime = System.nanoTime();
@@ -177,9 +177,9 @@ public class BatchQueue<Request, Response> {
 	 * @return the dequeued batched element
 	 */
 	private BatchElement<Request, Response> dequeue0() {
-		// Assumes we hold the lock and count > 0 (and thus that items[dequeueIndex] != null)
+		// Assumes we hold the lock and count > 0 (and thus items[dequeueIndex] != null)
 
-		BatchElement<Request, Response> x = items[dequeueIndex];
+		BatchElement<Request, Response> element = items[dequeueIndex];
 		items[dequeueIndex] = null;
 
 		dequeueIndex++;
@@ -188,7 +188,7 @@ public class BatchQueue<Request, Response> {
 		}
 		count--;
 		elementRemoved.signal();
-		return x;
+		return element;
 	}
 
 	/**
