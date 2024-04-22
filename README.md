@@ -22,6 +22,11 @@ The following timeouts are available:
 1. When enqueuing requests, you can specify the maximum time to block before failing.
 2. A queue has a linger time: how long requests can wait on the queue to collect a larger batch
 3. A queued request has a timeout: how long it may take to complete
+4. When acquiring a batch, you specify the maximum timeout to wait for elements to arrive
+
+The queue linger time and the timeout to acquire a batch influence eachother: when acquiring a
+batch, the specified timeout is an upper bound. The remaining linger time of the elements on
+the queue is honoured if possible.
 
 
 Logging and Metrics
