@@ -256,14 +256,14 @@ public class BatchQueue<Request, Response> {
 		lock.lock();
 		try {
 			isShutdown = true;
-			Metrics.globalRegistry.remove(queueTimer);
-			Metrics.globalRegistry.remove(processingTimer);
 			// Signal all waiting threads: as the queue can only be emptied now, there's no need to wait for capacity nor wait for new elements.
 			elementRemoved.signal();
 			elementAdded.signal();
 		} finally {
 			lock.unlock();
 		}
+		Metrics.globalRegistry.remove(queueTimer);
+		Metrics.globalRegistry.remove(processingTimer);
 	}
 
 	/**
@@ -313,21 +313,18 @@ public class BatchQueue<Request, Response> {
 			throw new IllegalArgumentException("timeout must be non-negative");
 		}
 		long nanosToTimeout = unit.toNanos(timeout);
-		boolean result;
+
 		lock.lock();
 		try {
-			while (!isShutdownComplete()) {
-				if (nanosToTimeout <= 0) {
-					break;
-				}
+			boolean result;
+			while (!(result = isShutdown && count == 0) && nanosToTimeout > 0) {
 				// dequeue0 signals elementRemoved
 				nanosToTimeout = elementRemoved.awaitNanos(nanosToTimeout);
 			}
-			result = isShutdownComplete();
+			return result;
 		} finally {
 			lock.unlock();
 		}
-		return result;
 	}
 
 	/**
@@ -375,7 +372,7 @@ public class BatchQueue<Request, Response> {
 					if (elementsInBatch == 0) {
 						// This is the first element in the batch, which will have the first expiring linger time on the queue.
 						// We update our remaining time (if needed) to honor that.
-						nanosToTimeout = Math.max(nanosToTimeout, lingerTimeLeft);
+						nanosToTimeout = Math.min(nanosToTimeout, lingerTimeLeft);
 					}
 
 					elementsInBatch++;

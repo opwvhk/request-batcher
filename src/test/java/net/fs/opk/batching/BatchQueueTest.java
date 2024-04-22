@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -25,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BatchQueueTest {
+	private static final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
 	@Test
 	@Timeout(value = 300, unit = MILLISECONDS)
@@ -192,13 +195,40 @@ class BatchQueueTest {
 	@Timeout(value = 300, unit = MILLISECONDS)
 	void verifyAwaitingNewElements_One() throws InterruptedException {
 		BatchQueue<String, String> queue = new BatchQueue<>(2, 10, MILLISECONDS, 30, TimeUnit.SECONDS);
-		queue.enqueue("one");
-		queue.enqueue("two").cancel(false);
+		queue.enqueue("one").cancel(false);
+		queue.enqueue("two");
 		queue.shutdown();
 
 		List<BatchElement<String, String>> batch = new ArrayList<>();
 		assertThat(queue.acquireBatch(10, NANOSECONDS, 10, batch)).isFalse();
+		assertThat(batch).extracting(BatchElement::getInputValue).containsExactly("two");
+	}
+
+	@Test
+	@Timeout(value = 300, unit = MILLISECONDS)
+	void verifyAwaitingNewElements_ShortLinger() throws InterruptedException {
+		BatchQueue<String, String> queue = new BatchQueue<>(2, 3, MILLISECONDS, 30, TimeUnit.SECONDS);
+		List<BatchElement<String, String>> batch = new ArrayList<>();
+
+		queue.enqueue("one");
+		// Delay adding the 2nd element, but within the linger time of the 1st element
+		delay(1, NANOSECONDS, () -> queue.enqueue("two"));
+		assertThat(queue.acquireBatch(10, MILLISECONDS, 10, batch)).isTrue();
+		assertThat(batch).extracting(BatchElement::getInputValue).containsExactly("one", "two");
+		batch.clear();
+
+		queue.enqueue("one");
+		// Delay adding the 2nd element, but outsize the linger time of the 1st element
+		delay(6, MILLISECONDS, () -> queue.enqueue("two"));
+		// Acquire batch with timeout shorter than the linger time of the 1st element
+		assertThat(queue.acquireBatch(10, MILLISECONDS, 10, batch)).isTrue();
 		assertThat(batch).extracting(BatchElement::getInputValue).containsExactly("one");
+
+		queue.shutdown();
+	}
+
+	private void delay(long delayMs, TimeUnit timeUnit, Runnable runnable) {
+		executor.schedule(runnable, delayMs, timeUnit);
 	}
 
 	@Test
@@ -235,7 +265,7 @@ class BatchQueueTest {
 			double processingTime = processingTimer.totalTime(MILLISECONDS);
 
 			assertThat(queuedTime).isLessThan(10); // less than linger time: this 1st item was already there when acquiring the batch
-			assertThat(processingTime - queuedTime).isGreaterThan(60); // 10ms linger + 50ms sleep
+			assertThat(processingTime - queuedTime).isLessThan(60); // 10ms linger + 50ms sleep, minus processing time
 		} finally {
 			Metrics.globalRegistry.remove(registry);
 		}
