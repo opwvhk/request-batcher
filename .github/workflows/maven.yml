@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Set up the Java JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           # Since August 2021, this replaces AdoptOpenJDK ('adopt')
           distribution: 'temurin'
