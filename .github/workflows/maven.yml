@@ -27,7 +27,7 @@ jobs:
     steps:
       # Note: this action must be first, as actions/setup-java needs it to set up the maven cache
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up the Java JDK
         uses: actions/setup-java@v5
