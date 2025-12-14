@@ -42,7 +42,7 @@ jobs:
         run: mvn --batch-mode --update-snapshots verify
 
       - name: Archive code coverage report
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: code-coverage-report
           path: target/site/jacoco/
