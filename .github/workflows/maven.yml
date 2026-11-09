@@ -34,7 +34,7 @@ jobs:
         with:
           # Since August 2021, this replaces AdoptOpenJDK ('adopt')
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '25'
           cache: 'maven'
           check-latest: true
 
