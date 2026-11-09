@@ -1,28 +1,34 @@
 package net.fs.opk.batching;
 
+import io.micrometer.core.instrument.Meter;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;
+import io.micrometer.core.instrument.observation.MeterObservationHandler;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationHandler;
+import io.micrometer.observation.ObservationRegistry;
+import io.micrometer.observation.Observations;
+import io.micrometer.tracing.handler.DefaultTracingObservationHandler;
+import io.micrometer.tracing.handler.TracingAwareMeterObservationHandler;
+import io.micrometer.tracing.test.simple.SimpleSpan;
+import io.micrometer.tracing.test.simple.SimpleTracer;
+import org.assertj.core.api.Condition;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import io.micrometer.core.instrument.Meter;
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import org.assertj.core.api.Condition;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-
-import static java.util.concurrent.TimeUnit.DAYS;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static java.util.concurrent.TimeUnit.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -33,35 +39,37 @@ class BatchQueueTest {
 	@Timeout(value = 300, unit = MILLISECONDS)
 	void verifyInvariants() throws InterruptedException {
 		Predicate<BatchQueue<String, String>> testInvariants =
-			it -> it.count <= it.items.length &&
-			      it.count % it.items.length == (it.items.length + it.enqueueIndex - it.dequeueIndex) % it.items.length &&
-			      it.count == Stream.of(it.items).filter(Objects::nonNull).count();
-		Condition<BatchQueue<String, String>> validInvariants = new Condition<>(testInvariants, "has valid invariants");
+			it -> it.size() <= it.items.length &&
+				  it.size() % it.items.length ==
+				  (it.items.length + it.enqueueIndex - it.dequeueIndex) % it.items.length &&
+				  it.size() == Stream.of(it.items).filter(Objects::nonNull).count();
+		Condition<BatchQueue<String, String>> validInvariants = new Condition<>(testInvariants, "has valid " +
+																								"invariants");
 
 		BatchQueue<String, String> queue = new BatchQueue<>(3, 10, NANOSECONDS, 10, MILLISECONDS);
-		assertThat(queue).has(validInvariants).matches(q -> q.count == 0, "size");
+		assertThat(queue).has(validInvariants).matches(q -> q.size() == 0, "size");
 
 		assertThat(queue.enqueue("one", 1, MILLISECONDS)).isNotNull();
-		assertThat(queue).has(validInvariants).matches(q -> q.count == 1, "size");
+		assertThat(queue).has(validInvariants).matches(q -> q.size() == 1, "size");
 
 		assertThat(queue.enqueue("two", 2, MILLISECONDS)).isNotNull();
-		assertThat(queue).has(validInvariants).matches(q -> q.count == 2, "size");
+		assertThat(queue).has(validInvariants).matches(q -> q.size() == 2, "size");
 
 		assertThat(queue.enqueue("three")).isNotNull();
-		assertThat(queue).has(validInvariants).matches(q -> q.count == 3, "size");
+		assertThat(queue).has(validInvariants).matches(q -> q.size() == 3, "size");
 
 		List<BatchElement<String, String>> batch = new ArrayList<>();
 		assertThat(queue.acquireBatch(0, MILLISECONDS, 2, batch)).isTrue();
 		assertThat(batch).extracting(BatchElement::getInputValue).containsExactly("one", "two");
-		assertThat(queue).has(validInvariants).matches(q -> q.count == 1, "size");
+		assertThat(queue).has(validInvariants).matches(q -> q.size() == 1, "size");
 
 		assertThat(queue.enqueue("four")).isNotNull();
-		assertThat(queue).has(validInvariants).matches(q -> q.count == 2, "size");
+		assertThat(queue).has(validInvariants).matches(q -> q.size() == 2, "size");
 
 		batch.clear();
 		assertThat(queue.acquireBatch(0, MILLISECONDS, 2, batch)).isTrue();
 		assertThat(batch).extracting(BatchElement::getInputValue).containsExactly("three", "four");
-		assertThat(queue).has(validInvariants).matches(q -> q.count == 0, "size");
+		assertThat(queue).has(validInvariants).matches(q -> q.size() == 0, "size");
 
 		queue.shutdown();
 	}
@@ -118,7 +126,8 @@ class BatchQueueTest {
 	void verifyArgumentChecksToAwaitShutdownComplete() {
 		BatchQueue<String, String> queue = new BatchQueue<>(3, 10, NANOSECONDS, 10, MILLISECONDS);
 
-		assertThatThrownBy(() -> queue.awaitShutdownComplete(-1, NANOSECONDS)).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> queue.awaitShutdownComplete(-1, NANOSECONDS)).isInstanceOf(
+			IllegalArgumentException.class);
 
 		queue.shutdown();
 	}
@@ -126,15 +135,20 @@ class BatchQueueTest {
 	@Test
 	void verifyConstructionArgumentChecks() {
 		// Capacity
-		assertThatThrownBy(() -> new BatchQueue<>(0, 10, NANOSECONDS, 10, MILLISECONDS)).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> new BatchQueue<>(0, 10, NANOSECONDS, 10, MILLISECONDS)).isInstanceOf(
+			IllegalArgumentException.class);
 
 		// Linger time
-		assertThatThrownBy(() -> new BatchQueue<>(1, -1, NANOSECONDS, 10, MILLISECONDS)).isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> new BatchQueue<>(1, 110000, DAYS, 10, DAYS)).isInstanceOf(IllegalArgumentException.class); // Way too long...
+		assertThatThrownBy(() -> new BatchQueue<>(1, -1, NANOSECONDS, 10, MILLISECONDS)).isInstanceOf(
+			IllegalArgumentException.class);
+		assertThatThrownBy(() -> new BatchQueue<>(1, 110000, DAYS, 10, DAYS)).isInstanceOf(
+			IllegalArgumentException.class); // Way too long...
 
 		// Timeout
-		assertThatThrownBy(() -> new BatchQueue<>(1, 10, NANOSECONDS, 10, NANOSECONDS)).isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> new BatchQueue<>(1, 10, NANOSECONDS, 110000, DAYS)).isInstanceOf(IllegalArgumentException.class); // Way too long...
+		assertThatThrownBy(() -> new BatchQueue<>(1, 10, NANOSECONDS, 10, NANOSECONDS)).isInstanceOf(
+			IllegalArgumentException.class);
+		assertThatThrownBy(() -> new BatchQueue<>(1, 10, NANOSECONDS, 110000, DAYS)).isInstanceOf(
+			IllegalArgumentException.class); // Way too long...
 	}
 
 	@Test
@@ -155,9 +169,11 @@ class BatchQueueTest {
 		BatchQueue<String, String> queue = new BatchQueue<>(3, 10, NANOSECONDS, 10, MILLISECONDS);
 		List<BatchElement<String, String>> list = new ArrayList<>();
 
-		assertThatThrownBy(() -> queue.acquireBatch(-1, NANOSECONDS, 1, list)).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> queue.acquireBatch(-1, NANOSECONDS, 1, list)).isInstanceOf(
+			IllegalArgumentException.class);
 		assertThatThrownBy(() -> queue.acquireBatch(1, null, 1, list)).isInstanceOf(NullPointerException.class);
-		assertThatThrownBy(() -> queue.acquireBatch(10, NANOSECONDS, 0, list)).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> queue.acquireBatch(10, NANOSECONDS, 0, list)).isInstanceOf(
+			IllegalArgumentException.class);
 		assertThatThrownBy(() -> queue.acquireBatch(10, NANOSECONDS, 1, null)).isInstanceOf(NullPointerException.class);
 
 		queue.shutdown();
@@ -234,11 +250,22 @@ class BatchQueueTest {
 	@Test
 	@Timeout(value = 300, unit = MILLISECONDS)
 	void verifyMetrics() throws InterruptedException {
-		SimpleMeterRegistry registry = new SimpleMeterRegistry();
-		try {
-			Metrics.globalRegistry.add(registry);
+		SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+		SimpleTracer tracer = new SimpleTracer();
 
-			BatchQueue<String, String> queue = new BatchQueue<>(2, 10, MILLISECONDS, 30, TimeUnit.SECONDS, "metrics_test");
+		ObservationRegistry observationRegistry = Observations.getGlobalRegistry();
+		ObservationRegistry.ObservationConfig observationConfig = observationRegistry.observationConfig();
+		MeterObservationHandler<?> meterObservationHandler = new DefaultMeterObservationHandler(meterRegistry);
+		ObservationHandler<?> observationHandler1 = new TracingAwareMeterObservationHandler<>(meterObservationHandler, tracer);
+		DefaultTracingObservationHandler observationHandler2 = new DefaultTracingObservationHandler(tracer);
+		observationConfig.observationHandler(observationHandler1);
+		observationConfig.observationHandler(observationHandler2);
+
+		try {
+			Metrics.globalRegistry.add(meterRegistry);
+
+			BatchQueue<String, String> queue = new BatchQueue<>(2, 10, MILLISECONDS, 30, TimeUnit.SECONDS,
+				"metrics_test", observationRegistry);
 			CompletableFuture<String> future = queue.enqueue("one");
 			List<BatchElement<String, String>> batch = new ArrayList<>();
 			assertThat(queue.acquireBatch(10, NANOSECONDS, 10, batch)).isTrue();
@@ -246,28 +273,27 @@ class BatchQueueTest {
 			future.complete("done");
 
 			List<Meter> meters = Metrics.globalRegistry.getMeters();
+			Deque<SimpleSpan> spans = tracer.getSpans();
 			queue.shutdown();
 
-			assertThat(meters).map(Meter::getId).map(Meter.Id::getName).filteredOn(s -> s.startsWith("metrics_test"))
-				.containsExactlyInAnyOrder("metrics_test.queued", "metrics_test.processing");
-			assertThat(meters).map(Meter::getId).filteredOn(id -> id.getName().startsWith("metrics_test")).map(Meter.Id::getType)
-				.containsExactly(Meter.Type.TIMER, Meter.Type.TIMER);
+			assertThat(spans.size()).isEqualTo(3);
+			assertThat(spans).map(SimpleSpan::getName).containsExactly("request_batch", "queue", "processing");
+			SimpleSpan requestBatchSpan = spans.pop();
+			SimpleSpan queueSpan = spans.pop();
+			SimpleSpan processingSpan = spans.pop();
+			assertThat(requestBatchSpan.getStartTimestamp()).isBeforeOrEqualTo(queueSpan.getStartTimestamp());
+			assertThat(queueSpan.getEndTimestamp()).isBeforeOrEqualTo(processingSpan.getStartTimestamp());
+			assertThat(processingSpan.getEndTimestamp()).isBeforeOrEqualTo(requestBatchSpan.getEndTimestamp());
 
-			Map<String, Meter> meterMap = meters.stream().filter(m -> m.getId().getName().startsWith("metrics_test"))
-				.collect(Collectors.toMap(m -> m.getId().getName(), m -> m));
+			Duration requestBatchDuration = Duration.between(requestBatchSpan.getStartTimestamp(), requestBatchSpan.getEndTimestamp());
+			Duration queueDuration = Duration.between(queueSpan.getStartTimestamp(), queueSpan.getEndTimestamp());
+			Duration processingDuration = Duration.between(processingSpan.getStartTimestamp(), processingSpan.getEndTimestamp());
 
-			Timer queuedTimer = (Timer) meterMap.get("metrics_test.queued");
-			assertThat(queuedTimer.count()).isEqualTo(1);
-			double queuedTime = queuedTimer.totalTime(MILLISECONDS);
-
-			Timer processingTimer = (Timer) meterMap.get("metrics_test.processing");
-			assertThat(processingTimer.count()).isEqualTo(1);
-			double processingTime = processingTimer.totalTime(MILLISECONDS);
-
-			assertThat(queuedTime).isLessThan(10); // less than linger time: this 1st item was already there when acquiring the batch
-			assertThat(processingTime - queuedTime).isLessThan(60); // 10ms linger + 50ms sleep, minus processing time
+			assertThat(requestBatchDuration).isGreaterThanOrEqualTo(queueDuration.plus(processingDuration));
+			assertThat(queueDuration).isLessThan(Duration.ofMillis(10)); // less than linger time: this 1st item was already there when acquiring the batch
+			assertThat(processingDuration).isLessThan(Duration.ofMillis(60)); // 10ms linger + 50ms sleep, minus processing time
 		} finally {
-			Metrics.globalRegistry.remove(registry);
+			Metrics.globalRegistry.remove(meterRegistry);
 		}
 	}
 }

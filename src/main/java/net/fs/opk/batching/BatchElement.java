@@ -16,12 +16,15 @@ public class BatchElement<T, R> {
 	 */
 	final long lingerDeadlineNanos;
 	private final T inputValue;
+	final CompletableFuture<Void> queueFuture;
 	final CompletableFuture<R> outputFuture;
 
 
 	BatchElement(T inputValue, long lingerDeadlineNanos, long completionTimeoutNanos) {
 		this.lingerDeadlineNanos = lingerDeadlineNanos;
 		this.inputValue = inputValue;
+
+		queueFuture = new CompletableFuture<>();
 		this.outputFuture = new CompletableFuture<R>().orTimeout(completionTimeoutNanos, TimeUnit.NANOSECONDS);
 	}
 

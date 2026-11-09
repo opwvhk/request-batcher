@@ -1,24 +1,24 @@
 package net.fs.opk.batching;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Class to start batched requests off a {@link BatchQueue}. Subclasses must at least implement
  * {@link #startRequest(List) startRequest(List&lt;BatchElement&lt;Request, Response&gt;&gt;)}, but may also override {@link #preBatch()}.
  *
- * <p>Implementation note: when running, the call sequence is always</p><ol>
+ * <p>Implementation note: when running, the call sequence is always:</p><ol>
  *
- * <li>{@code preBatch()}</li>
+ * <li>Call {@code preBatch()}</li>
  *
- * <li>acquire a batch from the queue</li>
+ * <li>Acquire a batch from the queue</li>
  *
- * <li>{@code startRequest(List<BatchElement<Request, Response>>)} (with an empty list if the queue was empty)</li>
+ * <li>Call {@code startRequest(List<BatchElement<Request, Response>>)} (with an empty list if the queue was empty)</li>
  *
  * </ol>
  */
