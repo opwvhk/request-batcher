@@ -54,7 +54,7 @@
 		<maven-gpg-plugin.version>3.1.0</maven-gpg-plugin.version>
 		<maven-install-plugin.version>3.1.1</maven-install-plugin.version>
 		<nexus-staging-maven-plugin.version>1.6.13</nexus-staging-maven-plugin.version>
-		<maven-surefire-plugin.version>3.6.0</maven-surefire-plugin.version>
+		<maven-surefire-plugin.version>3.6.1</maven-surefire-plugin.version>
 	</properties>
 
 	<dependencies>
@@ -74,7 +74,7 @@
 		<dependency>
 			<groupId>io.micrometer</groupId>
 			<artifactId>micrometer-core</artifactId>
-			<version>1.17.1</version>
+			<version>1.17.2</version>
 		</dependency>
 		<!-- Testing -->
 		<dependency>
@@ -107,7 +107,7 @@
 			<plugin>
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
-				<version>0.8.15</version>
+				<version>0.8.16</version>
 				<executions>
 					<execution>
 						<goals>
