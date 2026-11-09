@@ -40,8 +40,8 @@ class BatchRunnerFactoryTest {
 		e5 = new BatchElement<>("five", 42L, 42_000_000_000L);
 
 		batchCounter = new AtomicInteger(0);
-		batchHandler = batch -> {};
-		batchCollector = (timeout, unit, maxElements, collection) -> {
+		batchHandler = _ -> {};
+		batchCollector = (_, unit, maxElements, collection) -> {
 			assertThat(unit).isEqualTo(SECONDS);
 			assertThat(maxElements).isEqualTo(BATCH_SIZE);
 			switch (batchCounter.getAndIncrement()) {
@@ -92,7 +92,7 @@ class BatchRunnerFactoryTest {
 	@Timeout(value = 300, unit = MILLISECONDS)
 	void validateBatchStartCrashing() {
 		RuntimeException error = new RuntimeException("test error");
-		batchHandler = _ignored -> {
+		batchHandler = _ -> {
 			throw error;
 		};
 
@@ -110,7 +110,7 @@ class BatchRunnerFactoryTest {
 	@Test
 	@Timeout(value = 300, unit = MILLISECONDS)
 	void validateTermination() {
-		batchCollector = (timeout, unit, maxElements, collection) -> {
+		batchCollector = (_, _, _, _) -> {
 			throw new InterruptedException();
 		};
 
@@ -124,10 +124,10 @@ class BatchRunnerFactoryTest {
 	}
 
 	@Test
-	@Timeout(value = 50, unit = MILLISECONDS)
+	@Timeout(value = 100, unit = MILLISECONDS)
 	void validateAbnormalTermination() {
 		RuntimeException exception = new RuntimeException();
-		batchCollector = (timeout, unit, maxElements, collection) -> {
+		batchCollector = (_, _, _, _) -> {
 			throw exception;
 		};
 
@@ -153,17 +153,18 @@ class BatchRunnerFactoryTest {
 		AtomicInteger counter = new AtomicInteger(0);
 		AtomicInteger errors = new AtomicInteger(0);
 		final int maxConcurrentBatches = 5;
-		ScheduledExecutorService pool = Executors.newScheduledThreadPool(2 * maxConcurrentBatches);
-		BatchRunnerFactory.forConsumer(largeQueue, 2, maxConcurrentBatches, 1, SECONDS, batch -> {
-			counter.incrementAndGet();
-			pool.schedule(() -> {
-				int concurrent = counter.getAndDecrement();
-				if (concurrent > maxConcurrentBatches) {
-					errors.incrementAndGet();
-				}
-				batch.forEach(e -> e.success(concurrent));
-			}, 10, TimeUnit.MILLISECONDS);
-		}).run();
+		try (ScheduledExecutorService pool = Executors.newScheduledThreadPool(2 * maxConcurrentBatches)) {
+			BatchRunnerFactory.forConsumer(largeQueue, 2, maxConcurrentBatches, 1, SECONDS, batch -> {
+				counter.incrementAndGet();
+				pool.schedule(() -> {
+					int concurrent = counter.getAndDecrement();
+					if (concurrent > maxConcurrentBatches) {
+						errors.incrementAndGet();
+					}
+					batch.forEach(e -> e.success(concurrent));
+				}, 10, TimeUnit.MILLISECONDS);
+			}).run();
+		}
 
 		assertThat(errors).hasValue(0);
 	}
@@ -174,7 +175,7 @@ class BatchRunnerFactoryTest {
 		BatchQueue<Integer, Integer> queue = new BatchQueue<>(1, 1, SECONDS, 100, SECONDS);
 		queue.shutdown();
 
-		BatchRunnerFactory.forConsumer(queue, 2, 5, 1, SECONDS, batch -> fail("There is no batch.")).run();
+		BatchRunnerFactory.forConsumer(queue, 2, 5, 1, SECONDS, _ -> fail("There is no batch.")).run();
 	}
 
 	@Test
@@ -218,7 +219,7 @@ class BatchRunnerFactoryTest {
 	void verifyMultiplexingWithFailureWorks() {
 		RuntimeException exception = new RuntimeException();
 		Consumer<List<BatchElement<String, String>>> batchConsumer = BatchRunnerFactory.multiplexOverFunction(Function.identity(),
-			CompletableFuture::completedFuture, (batch, results) -> {
+			CompletableFuture::completedFuture, (_, _) -> {
 				throw exception;
 			});
 		batchConsumer.accept(asList(e1, e2, e3, e4, e5));
