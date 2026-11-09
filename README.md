@@ -29,21 +29,26 @@ batch, the specified timeout is an upper bound. The remaining linger time of the
 the queue is honoured if possible.
 
 
-Logging and Metrics
--------------------
+Logging and Observations (Metrics and Traces)
+---------------------------------------------
 
 This library uses [SLF4J](https://www.slf4j.org/) for logging and
-[micrometer](https://micrometer.io/) for metrics.
+[micrometer](https://micrometer.io/) for _observations_ (this includes both metrics and traces).
 
-Logs are written only using the name `net.fs.opk.batching.BatchRunner`, describing changes in run
-state.
+Logs are written only using the logger name `net.fs.opk.batching.BatchRunner`, describing changes in
+run state.
 
-The following metrics are exposed:
+The following observations are exposed :
 
-| Metric                    | Type  | Description                                          |
-|---------------------------|-------|------------------------------------------------------|
-| `<queue name>.queued`     | Timer | The time spent on the queue                          |
-| `<queue name>.processing` | Timer | The time it took to process an item since enqueueing |
+| Observation     | Observes                                      |
+|-----------------|-----------------------------------------------|
+| `request_batch` | The start of queuing until processing is done |
+| `queue`         | The time spent on the queue                   |
+| `processing`    | The time spent processing                     |
+
+The observations carry a `BatchQueueContext`, with which an `ObservationConvention` can be used to
+add tags. A default implementation, `net.fs.opk.batching.DefaultBatchQueueObservationConvention`,
+adds the queue name as a tag to both metrics and traces.
 
 
 Usage example
@@ -52,52 +57,65 @@ Usage example
 In this (contrived) example we'll batch numbered requests, returning a description. In real
 scenario's you'd perform a network call.
 
-````java
-import net.fs.opk.batching.BatchQueue;
+```java
+import io.micrometer.observation.ObservationRegistry;
+import io.micrometer.tracing.handler.DefaultTracingObservationHandler;
 import net.fs.opk.batching.BatchElement;
+import net.fs.opk.batching.BatchQueue;
 import net.fs.opk.batching.BatchRunnerFactory;
 
-import java.util.List;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class Example {
-	public static void main(String[] args) {
+    static void main(String[] args) {
 
-		// Step 1 (configuration): create a BatchQueue, and start at least one BatchRunner to consume it
+        // Step 0 (optional): the application should have a ObservationRegistry to handle metrics
+        // and tracing.
 
-		BatchQueue<Integer, String> batchQueue = new BatchQueue<>(10_000,
-			1, MILLISECONDS, 30, SECONDS);
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        SimpleTracer tracer = new SimpleTracer();
 
-		ExecutorService executor = Executors.newFixedThreadPool(1);
-		executor.execute(BatchRunnerFactory.forConsumer(batchQueue, 5, batch -> {
-			// Here, you'd probably implement a call to a bulk API...
-			String suffix = " with " + (batch.size() - 1) + " other elements";
-			for (BatchElement<Integer, String> element : batch) {
-				element.success("Batched " + element.getInputValue() + suffix);
-			}
-		}));
+        ObservationRegistry observationRegistry = Observations.getGlobalRegistry();
+        val observationConfig = observationRegistry.observationConfig();
+		observationConfig.observationHandler(new TracingAwareMeterObservationHandler<>(
+                new DefaultMeterObservationHandler(meterRegistry), tracer));
+        observationConfig.observationHandler(new DefaultTracingObservationHandler(tracer));
 
-		// Step 2 (using): use the queue to batch requests
+        // Step 1 (configuration): create a BatchQueue, and start at least one BatchRunner to consume it
 
-		for (int request = 0; request < 1000; request++) {
-			// Here, you'll want to implement your actual application
-			CompletableFuture<String> futureResult = batchQueue.enqueue(request);
-			futureResult.thenAccept(System.out::println);
-		}
+        BatchQueue<Integer, String> batchQueue = new BatchQueue<>(10_000,
+                1, MILLISECONDS, 30, SECONDS);
 
-		// Step 3 (cleanup): to close your application, the queue must be shutdown
-		// (after that, the BatchRunner will stop itself when the queue is empty)
+        ExecutorService executor = Executors.newFixedThreadPool(1);
+        executor.execute(BatchRunnerFactory.forConsumer(batchQueue, 5, batch -> {
+            // Here, you'd probably implement a call to a bulk API...
+            String suffix = " with " + (batch.size() - 1) + " other elements";
+            for (BatchElement<Integer, String> element : batch) {
+                element.success("Batched " + element.getInputValue() + suffix);
+            }
+        }));
 
-		batchQueue.shutdown();
-		// Optional: wait until the queue is empty and the BatchRunner has terminated.
-		batchQueue.awaitShutdownComplete(100, MILLISECONDS);
-		// Optional: shutdown the executor if you used a dedicated one.
-		executor.shutdown();
-	}
+        // Step 2 (using): use the queue to batch requests
+
+        for (int request = 0; request < 1000; request++) {
+            // Here, you'll want to implement your actual application
+            CompletableFuture<String> futureResult = batchQueue.enqueue(request);
+            futureResult.thenAccept(System.out::println);
+        }
+
+        // Step 3 (clean-up): to close your application, the queue must be shutdown
+        // (after that, the BatchRunner will stop itself when the queue is empty)
+
+        batchQueue.shutdown();
+        // Optional: wait until the queue is empty and the BatchRunner has terminated.
+        batchQueue.awaitShutdownComplete(100, MILLISECONDS);
+        // Optional: shutdown the executor if you used a dedicated one.
+        executor.shutdown();
+    }
 }
-````
+```
 
