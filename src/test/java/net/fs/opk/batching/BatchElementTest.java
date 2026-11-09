@@ -1,11 +1,11 @@
 package net.fs.opk.batching;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 import java.time.Duration;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -32,7 +32,8 @@ class BatchElementTest {
 
 	@Test
 	void verifySimpleFields() {
-		BatchElement<Integer, Integer> element = new BatchElement<>(inputValue, lingerDeadlineNanos, completionTimeoutNanos);
+		BatchElement<Integer, Integer> element = new BatchElement<>(inputValue, lingerDeadlineNanos,
+			completionTimeoutNanos);
 		assertThat(element.lingerDeadlineNanos).isEqualTo(lingerDeadlineNanos);
 		assertThat(element.getInputValue()).isEqualTo(inputValue);
 		assertThat(element.outputFuture).isNotDone();
@@ -41,7 +42,8 @@ class BatchElementTest {
 
 	@Test
 	void verifySuccess() {
-		BatchElement<Integer, Integer> element = new BatchElement<>(inputValue, lingerDeadlineNanos, completionTimeoutNanos);
+		BatchElement<Integer, Integer> element = new BatchElement<>(inputValue, lingerDeadlineNanos,
+			completionTimeoutNanos);
 
 		element.success(outputValue);
 		assertThat(element.outputFuture).isCompletedWithValue(outputValue);
@@ -50,7 +52,8 @@ class BatchElementTest {
 
 	@Test
 	void verifyFailure() {
-		BatchElement<Integer, Integer> element = new BatchElement<>(inputValue, lingerDeadlineNanos, completionTimeoutNanos);
+		BatchElement<Integer, Integer> element = new BatchElement<>(inputValue, lingerDeadlineNanos,
+			completionTimeoutNanos);
 
 		element.error(error);
 		assertThat(element.outputFuture)
@@ -62,7 +65,8 @@ class BatchElementTest {
 
 	@Test
 	void verifySuccessForCompletableFutures() {
-		BatchElement<Integer, Integer> element = new BatchElement<>(inputValue, lingerDeadlineNanos, completionTimeoutNanos);
+		BatchElement<Integer, Integer> element = new BatchElement<>(inputValue, lingerDeadlineNanos,
+			completionTimeoutNanos);
 		CompletableFuture.completedFuture(outputValue).whenComplete(element::report);
 
 		assertThat(element.outputFuture).isCompletedWithValue(outputValue);
@@ -71,7 +75,8 @@ class BatchElementTest {
 
 	@Test
 	void verifyFailureForCompletableFutures() {
-		BatchElement<Integer, Integer> element = new BatchElement<>(inputValue, lingerDeadlineNanos, completionTimeoutNanos);
+		BatchElement<Integer, Integer> element = new BatchElement<>(inputValue, lingerDeadlineNanos,
+			completionTimeoutNanos);
 		CompletableFuture.<Integer>failedFuture(error).whenComplete(element::report);
 
 		assertThat(element.outputFuture)

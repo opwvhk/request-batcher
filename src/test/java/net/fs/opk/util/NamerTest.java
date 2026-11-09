@@ -2,8 +2,7 @@ package net.fs.opk.util;
 
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class NamerTest {
 	@Test
@@ -22,7 +21,7 @@ class NamerTest {
 
 	@Test
 	void testPrefixSanitation() {
-		Namer namer = new Namer(" ná -Me _");
+		Namer namer = new Namer(" ná_ Me -");
 		assertThat(namer.name(null)).isEqualTo("na_me_1");
 		assertThat(namer.name(null)).isEqualTo("na_me_2");
 		assertThat(namer.name(null)).isEqualTo("na_me_3");
